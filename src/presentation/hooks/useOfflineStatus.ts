@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { OfflineStorageService } from '@/src/infrastructure/services/offline/offline-storage.service';
+import { OfflineStorageService } from '@/infrastructure/services/offline/offline-storage.service';
 
 export function useOfflineStatus() {
   const [isOnline, setIsOnline] = useState(true);
@@ -9,7 +9,6 @@ export function useOfflineStatus() {
   const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
-    // Verificar estado inicial
     setIsOnline(navigator.onLine);
 
     const handleOnline = () => {
@@ -31,7 +30,6 @@ export function useOfflineStatus() {
     };
   }, []);
 
-  // Verificar operaciones pendientes
   useEffect(() => {
     const checkPending = async () => {
       try {
@@ -44,7 +42,7 @@ export function useOfflineStatus() {
     };
 
     checkPending();
-    const interval = setInterval(checkPending, 30000); // Cada 30 segundos
+    const interval = setInterval(checkPending, 30000);
 
     return () => clearInterval(interval);
   }, []);

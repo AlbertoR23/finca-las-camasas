@@ -6,6 +6,7 @@ import {
   XAxis,
   CartesianGrid,
   Tooltip,
+  TooltipProps,
 } from "recharts";
 import { Card } from "../../../common/Card/Card";
 import { RegistroProduccion } from "@/src/core/entities/RegistroProduccion";
@@ -15,6 +16,19 @@ interface GraficoProduccionProps {
   titulo?: string;
   height?: number;
 }
+
+// 🎨 Tooltip personalizado con diseño mejorado
+const CustomTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white p-3 rounded-xl shadow-lg border border-slate-200">
+        <p className="text-sm font-bold text-slate-900">{payload[0].payload.fecha}</p>
+        <p className="text-lg font-black text-emerald-600">{payload[0].value} L</p>
+      </div>
+    );
+  }
+  return null;
+};
 
 export function GraficoProduccion({
   registros,
@@ -47,38 +61,61 @@ export function GraficoProduccion({
     );
   }
 
+  // 📊 Cálculos de estadísticas
+  const promedio =
+    registros.reduce((acc, r) => acc + r.litrosLeche, 0) / registros.length;
+  const total = registros.reduce((acc, r) => acc + r.litrosLeche, 0);
+
   return (
     <Card>
-      <p className="text-[10px] font-black text-slate-300 uppercase mb-2">
-        {titulo}
-      </p>
+      {/* 🎯 Título prominente con icono */}
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-2xl">🥛</span>
+        <h3 className="text-sm font-black text-slate-700 uppercase tracking-wide">
+          {titulo}
+        </h3>
+      </div>
+
+      {/* 📈 Gráfico con animación */}
       <div style={{ height: `${height}px` }} className="w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={datosGrafica}>
+          <AreaChart
+            data={datosGrafica}
+            margin={{ top: 5, right: 5, left: 0, bottom: 5 }}
+          >
             <defs>
+              {/* 🎨 Degradado mejorado más atractivo */}
               <linearGradient id="colorLitro" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#10B981" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+                <stop offset="0%" stopColor="#10B981" stopOpacity={0.4} />
+                <stop offset="50%" stopColor="#10B981" stopOpacity={0.2} />
+                <stop offset="100%" stopColor="#10B981" stopOpacity={0.05} />
               </linearGradient>
             </defs>
+
+            {/* 🔲 Grid más sutil */}
             <CartesianGrid
               strokeDasharray="3 3"
               vertical={false}
-              stroke="#F1F5F9"
+              stroke="#E2E8F0"
+              opacity={0.5}
             />
+
+            {/* 📅 Eje X con mejor legibilidad - evita superposición */}
             <XAxis
               dataKey="fecha"
               axisLine={false}
               tickLine={false}
-              tick={{ fontSize: 10, fill: "#94A3B8", fontWeight: "bold" }}
+              tick={{ fontSize: 9, fill: "#64748B", fontWeight: "600" }}
+              interval={datosGrafica.length > 15 ? "preserveStartEnd" : 0}
+              angle={datosGrafica.length > 15 ? -15 : 0}
+              textAnchor={datosGrafica.length > 15 ? "end" : "middle"}
+              height={datosGrafica.length > 15 ? 40 : 30}
             />
-            <Tooltip
-              contentStyle={{
-                borderRadius: "16px",
-                border: "none",
-                boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
-              }}
-            />
+
+            {/* 💬 Tooltip personalizado */}
+            <Tooltip content={<CustomTooltip />} cursor={{ strokeWidth: 2 }} />
+
+            {/* 📊 Área con animación y línea gruesa */}
             <Area
               type="monotone"
               dataKey="litros"
@@ -86,25 +123,51 @@ export function GraficoProduccion({
               stroke="#10B981"
               strokeWidth={4}
               fill="url(#colorLitro)"
+              dot={{
+                fill: "#10B981",
+                strokeWidth: 2,
+                stroke: "#fff",
+                r: 4,
+              }}
+              activeDot={{
+                r: 6,
+                strokeWidth: 3,
+                stroke: "#fff",
+                fill: "#10B981",
+              }}
+              animationDuration={1200}
+              animationEasing="ease-out"
             />
           </AreaChart>
         </ResponsiveContainer>
       </div>
 
+      {/* 📊 Estadísticas mejoradas debajo del gráfico */}
       {datosGrafica.length > 0 && (
-        <div className="flex justify-between mt-4 text-[8px] text-slate-400 font-bold">
-          <span>
-            Promedio:{" "}
-            {(
-              registros.reduce((acc, r) => acc + r.litrosLeche, 0) /
-              registros.length
-            ).toFixed(1)}{" "}
-            L
-          </span>
-          <span>
-            Total:{" "}
-            {registros.reduce((acc, r) => acc + r.litrosLeche, 0).toFixed(1)} L
-          </span>
+        <div className="mt-6 pt-4 border-t border-slate-100">
+          <div className="grid grid-cols-2 gap-4">
+            {/* Promedio */}
+            <div className="text-center">
+              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-1">
+                Promedio
+              </p>
+              <p className="text-emerald-600 font-black text-lg">
+                {promedio.toFixed(1)}
+                <span className="text-xs ml-1 font-semibold">L</span>
+              </p>
+            </div>
+
+            {/* Total */}
+            <div className="text-center">
+              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-1">
+                Total
+              </p>
+              <p className="text-emerald-600 font-black text-lg">
+                {total.toFixed(1)}
+                <span className="text-xs ml-1 font-semibold">L</span>
+              </p>
+            </div>
+          </div>
         </div>
       )}
     </Card>

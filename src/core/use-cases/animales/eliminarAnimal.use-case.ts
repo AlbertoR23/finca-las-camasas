@@ -1,4 +1,4 @@
-import { IAnimalRepository } from "../../repositories/IAnimalRepository";
+import { IAnimalRepository } from '../../repositories/IAnimalRepository';
 
 export class EliminarAnimalUseCase {
   constructor(private animalRepository: IAnimalRepository) {}
@@ -6,7 +6,7 @@ export class EliminarAnimalUseCase {
   async execute(id: string): Promise<void> {
     // Validaciones de negocio antes de eliminar
     // Por ejemplo: verificar que no tenga registros asociados
-
+    
     await this.animalRepository.delete(id);
   }
 }

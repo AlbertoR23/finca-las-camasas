@@ -1,5 +1,5 @@
-import { IAnimalRepository } from "../../repositories/IAnimalRepository";
-import { Animal } from "../../entities/Animal";
+import { IAnimalRepository } from '../../repositories/IAnimalRepository';
+import { Animal } from '../../entities/Animal';
 
 export class ObtenerAnimalesUseCase {
   constructor(private animalRepository: IAnimalRepository) {}

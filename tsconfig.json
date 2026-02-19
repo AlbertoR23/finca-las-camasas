@@ -25,15 +25,21 @@
     "paths": {
       "@/*": [
         "./*"
-      ],
-      "@/src/*": [
-        "./src/*"
+      ], // Esto permite importar desde @/src, @/app, etc.
+      "@/core/*": [
+        "./src/core/*"
+      ], // Mapea @/core a src/core
+      "@/infrastructure/*": [
+        "./src/infrastructure/*"
+      ], // Mapea @/infrastructure a src/infrastructure
+      "@/presentation/*": [
+        "./src/presentation/*"
+      ], // Mapea @/presentation a src/presentation
+      "@/utils/*": [
+        "./utils/*"
       ],
       "@/types/*": [
         "./types/*"
-      ],
-      "@/utils/*": [
-        "./utils/*"
       ]
     }
   },

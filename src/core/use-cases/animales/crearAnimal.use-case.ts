@@ -1,12 +1,11 @@
-// src/core/use-cases/animales/crearAnimal.use-case.ts
-import { Animal } from "../../entities/Animal";
-import { IAnimalRepository } from "../../repositories/IAnimalRepository";
+import { Animal } from '../../entities/Animal';
+import { IAnimalRepository } from '../../repositories/IAnimalRepository';
 
 interface CrearAnimalRequest {
   nombre: string;
   numeroArete: string;
   fechaNacimiento: Date;
-  sexo: "Macho" | "Hembra";
+  sexo: 'Macho' | 'Hembra';
   padreId?: string | null;
   madreId?: string | null;
 }
@@ -21,7 +20,7 @@ export class CrearAnimalUseCase {
 
   async execute(request: CrearAnimalRequest): Promise<CrearAnimalResponse> {
     // Validaciones de negocio
-    if (request.sexo === "Macho") {
+    if (request.sexo === 'Macho') {
       // Regla de negocio: Los machos no necesitan genealogía completa
       // pero podemos validar algo específico
     }
@@ -37,7 +36,7 @@ export class CrearAnimalUseCase {
 
     return {
       animal: animalGuardado,
-      fechaDestete,
+      fechaDestete
     };
   }
 }

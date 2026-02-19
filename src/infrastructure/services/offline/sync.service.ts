@@ -1,6 +1,5 @@
-// src/infrastructure/services/offline/sync.service.ts
 import { OfflineStorageService } from './offline-storage.service';
-import { createClient } from '@/utils/supabase/client';
+import { createClient } from '../../../../utils/supabase/client';
 
 export class SyncService {
   private static instance: SyncService;
@@ -76,7 +75,6 @@ export class SyncService {
   }
 
   private async refreshCache(): Promise<void> {
-    // Recargar datos frescos de Supabase
     const tables = ['animales', 'contabilidad', 'registros_diarios', 'vacunas'];
     
     for (const table of tables) {

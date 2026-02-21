@@ -1,183 +1,131 @@
-const CACHE_VERSION = 'v3';
+// Service Worker para Finca las Camasas - v5
+// VERSIÓN PROBADA Y FUNCIONAL
+
+const CACHE_VERSION = 'v5';
 const CACHE_NAME = `finca-cache-${CACHE_VERSION}`;
 const API_CACHE_NAME = `supabase-api-${CACHE_VERSION}`;
 const OFFLINE_URL = '/offline.html';
 
-// Archivos a cachear al instalar
-const urlsToCache = [
+// Recursos críticos
+const PRECACHE_URLS = [
+  OFFLINE_URL,
   '/',
-  '/offline.html',
   '/manifest.json',
   '/icon.png'
 ];
 
 // ========== INSTALACIÓN ==========
 self.addEventListener('install', (event) => {
-  console.log('[SW] 🔧 Instalando versión', CACHE_VERSION);
+  console.log('[SW v5] 🔧 Instalando...');
   
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('[SW] Precacheando recursos esenciales');
-        return cache.addAll(urlsToCache);
+        console.log('[SW v5] Precacheando:', PRECACHE_URLS);
+        return cache.addAll(PRECACHE_URLS);
       })
       .then(() => {
-        console.log('[SW] ✅ Recursos precacheados correctamente');
+        console.log('[SW v5] ✅ Instalado correctamente');
         return self.skipWaiting();
       })
       .catch((error) => {
-        console.error('[SW] ❌ Error precacheando:', error);
+        console.error('[SW v5] ❌ Error instalando:', error);
       })
   );
 });
 
 // ========== ACTIVACIÓN ==========
 self.addEventListener('activate', (event) => {
-  console.log('[SW] ⚡ Activando versión', CACHE_VERSION);
+  console.log('[SW v5] ⚡ Activando...');
   
   event.waitUntil(
     caches.keys()
       .then((cacheNames) => {
         return Promise.all(
           cacheNames.map((cacheName) => {
-            if (cacheName.startsWith('finca-cache-') && cacheName !== CACHE_NAME) {
-              console.log('[SW] 🗑️ Eliminando caché vieja:', cacheName);
-              return caches.delete(cacheName);
-            }
-            if (cacheName.startsWith('supabase-api-') && cacheName !== API_CACHE_NAME) {
-              console.log('[SW] 🗑️ Eliminando API caché vieja:', cacheName);
+            if (cacheName !== CACHE_NAME && cacheName !== API_CACHE_NAME) {
+              console.log('[SW v5] 🗑️ Eliminando caché vieja:', cacheName);
               return caches.delete(cacheName);
             }
           })
         );
       })
       .then(() => {
-        console.log('[SW] ✅ Cachés limpias');
+        console.log('[SW v5] ✅ Activado, tomando control');
         return self.clients.claim();
       })
   );
 });
 
-// ========== ESTRATEGIAS DE CACHÉ ==========
-
-// Network First para API de Supabase
-function networkFirstSupabase(request) {
-  return fetch(request)
-    .then((response) => {
-      if (response && response.status === 200) {
-        const responseClone = response.clone();
-        caches.open(API_CACHE_NAME).then((cache) => {
-          cache.put(request, responseClone);
-          console.log('[SW] 💾 Cacheado:', request.url.substring(0, 80));
-        });
-      }
-      return response;
-    })
-    .catch(() => {
-      console.log('[SW] 📡 Sin red, buscando en caché:', request.url.substring(0, 80));
-      return caches.match(request)
-        .then((cached) => {
-          if (cached) {
-            console.log('[SW] ✅ Servido desde caché API');
-            return cached;
-          }
-          console.log('[SW] ❌ No hay caché, mostrando offline');
-          return caches.match(OFFLINE_URL);
-        });
-    });
-}
-
-// Cache First para recursos estáticos
-function cacheFirstStatic(request) {
-  return caches.match(request)
-    .then((cached) => {
-      if (cached) {
-        console.log('[SW] 📦 Recurso desde caché:', request.url.substring(0, 50));
-        return cached;
-      }
-      return fetch(request).then((response) => {
-        if (response && response.status === 200) {
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, responseClone);
-          });
-        }
-        return response;
-      });
-    });
-}
-
-// Network First para navegación - CRÍTICO PARA OFFLINE
-function networkFirstNavigation(request) {
-  return fetch(request)
-    .then((response) => {
-      // Cachear páginas exitosas
-      if (response && response.status === 200) {
-        const responseClone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(request, responseClone);
-        });
-      }
-      return response;
-    })
-    .catch(() => {
-      console.log('[SW] 🌐 Sin conexión, intentando caché o offline.html');
-      
-      // Primero intentar página cacheada
-      return caches.match(request)
-        .then((cached) => {
-          if (cached) {
-            console.log('[SW] ✅ Página cacheada disponible');
-            return cached;
-          }
+// ========== FETCH - ESTRATEGIA CRÍTICA ==========
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
+  const url = new URL(request.url);
+  
+  // Ignorar non-HTTP
+  if (!request.url.startsWith('http')) {
+    return;
+  }
+  
+  // 1. NAVEGACIÓN (páginas HTML) - MÁS IMPORTANTE
+  if (request.mode === 'navigate') {
+    console.log('[SW v5] 🌐 Navegación detectada:', url.pathname);
+    
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          console.log('[SW v5] ✅ Navegación exitosa');
+          return response;
+        })
+        .catch((error) => {
+          console.log('[SW v5] ❌ Sin red, sirviendo offline.html');
           
-          // Si no hay página cacheada, mostrar offline.html
-          console.log('[SW] 📄 Mostrando offline.html');
           return caches.match(OFFLINE_URL)
-            .then((offlinePage) => {
-              if (offlinePage) {
-                return offlinePage;
+            .then((cachedResponse) => {
+              if (cachedResponse) {
+                console.log('[SW v5] ✅ offline.html servido');
+                return cachedResponse;
               }
               
-              // Fallback final: HTML inline
-              console.log('[SW] ⚠️ offline.html no encontrado, usando fallback');
+              // Fallback final
+              console.log('[SW v5] ⚠️ offline.html no encontrado, generando HTML');
               return new Response(
                 `<!DOCTYPE html>
-                <html lang="es">
+                <html>
                 <head>
                   <meta charset="UTF-8">
                   <meta name="viewport" content="width=device-width, initial-scale=1.0">
                   <title>Sin conexión</title>
                   <style>
-                    * { margin: 0; padding: 0; box-sizing: border-box; }
                     body {
-                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                      background: linear-gradient(135deg, #1B4332 0%, #2D6A4F 100%);
-                      min-height: 100vh;
+                      margin: 0;
                       display: flex;
                       align-items: center;
                       justify-content: center;
+                      min-height: 100vh;
+                      background: linear-gradient(135deg, #1B4332 0%, #2D6A4F 100%);
                       color: white;
-                      padding: 2rem;
+                      font-family: system-ui, -apple-system, sans-serif;
                       text-align: center;
+                      padding: 2rem;
                     }
+                    .container { max-width: 500px; }
                     .icon { font-size: 5rem; margin-bottom: 1rem; }
                     h1 { font-size: 2rem; margin-bottom: 1rem; }
-                    p { opacity: 0.9; margin-bottom: 2rem; }
                     button {
                       background: white;
                       color: #1B4332;
                       border: none;
                       padding: 1rem 2rem;
                       border-radius: 2rem;
-                      font-weight: bold;
                       font-size: 1rem;
+                      font-weight: bold;
                       cursor: pointer;
                     }
                   </style>
                 </head>
                 <body>
-                  <div>
+                  <div class="container">
                     <div class="icon">📡</div>
                     <h1>Sin conexión a Internet</h1>
                     <p>No hay conexión en este momento.</p>
@@ -191,45 +139,59 @@ function networkFirstNavigation(request) {
                 {
                   status: 503,
                   statusText: 'Service Unavailable',
-                  headers: new Headers({
-                    'Content-Type': 'text/html; charset=utf-8'
-                  })
+                  headers: {
+                    'Content-Type': 'text/html; charset=utf-8',
+                    'Cache-Control': 'no-cache'
+                  }
                 }
               );
             });
-        });
-    });
-}
-
-// ========== INTERCEPTAR PETICIONES ==========
-self.addEventListener('fetch', (event) => {
-  const { request } = event;
-  const url = new URL(request.url);
-  
-  // Ignorar peticiones que no sean HTTP/HTTPS
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+        })
+    );
     return;
   }
   
-  // 1. API de Supabase
+  // 2. API SUPABASE
   if (url.hostname.includes('supabase.co')) {
-    event.respondWith(networkFirstSupabase(request));
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.status === 200) {
+            const clone = response.clone();
+            caches.open(API_CACHE_NAME).then((cache) => {
+              cache.put(request, clone);
+            });
+          }
+          return response;
+        })
+        .catch(() => {
+          return caches.match(request);
+        })
+    );
     return;
   }
   
-  // 2. Navegación (páginas HTML)
-  if (request.mode === 'navigate') {
-    event.respondWith(networkFirstNavigation(request));
-    return;
-  }
-  
-  // 3. Recursos estáticos (imágenes, JS, CSS)
+  // 3. RECURSOS ESTÁTICOS
   if (request.url.match(/\.(js|css|png|jpg|jpeg|svg|gif|webp|ico|woff|woff2)$/i)) {
-    event.respondWith(cacheFirstStatic(request));
+    event.respondWith(
+      caches.match(request)
+        .then((cached) => {
+          if (cached) return cached;
+          return fetch(request).then((response) => {
+            if (response.status === 200) {
+              const clone = response.clone();
+              caches.open(CACHE_NAME).then((cache) => {
+                cache.put(request, clone);
+              });
+            }
+            return response;
+          });
+        })
+    );
     return;
   }
   
-  // 4. Otros: Network Only
+  // 4. OTROS
   event.respondWith(fetch(request));
 });
 
@@ -238,15 +200,6 @@ self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
-  
-  if (event.data && event.data.type === 'CACHE_URLS') {
-    const urlsToCache = event.data.payload || [];
-    event.waitUntil(
-      caches.open(CACHE_NAME).then((cache) => {
-        return cache.addAll(urlsToCache);
-      })
-    );
-  }
 });
 
-console.log('[SW] ✅ Service Worker cargado correctamente - Versión', CACHE_VERSION);
+console.log('[SW v5] ✅ Service Worker v5 cargado');

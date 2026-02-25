@@ -1,5 +1,5 @@
 // src/presentation/hooks/useAnimales.ts
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Animal } from "@/src/core/entities/Animal";
 import { SupabaseAnimalRepository } from "@/src/infrastructure/repositories/supabase/SupabaseAnimalRepository";
 import { CrearAnimalUseCase } from "@/src/core/use-cases/animales/crearAnimal.use-case";
@@ -11,25 +11,35 @@ export function useAnimales() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Inicializar repositorio y casos de uso
-  const animalRepository = new SupabaseAnimalRepository();
+  // Usar useRef para mantener las mismas instancias entre renders
+  const animalRepositoryRef = useRef(new SupabaseAnimalRepository());
 
-  const obtenerAnimalesUseCase = new ObtenerAnimalesUseCase(animalRepository);
-  const crearAnimalUseCase = new CrearAnimalUseCase(animalRepository);
-  const eliminarAnimalUseCase = new EliminarAnimalUseCase(animalRepository);
+  const obtenerAnimalesUseCaseRef = useRef(
+    new ObtenerAnimalesUseCase(animalRepositoryRef.current),
+  );
+  const crearAnimalUseCaseRef = useRef(
+    new CrearAnimalUseCase(animalRepositoryRef.current),
+  );
+  const eliminarAnimalUseCaseRef = useRef(
+    new EliminarAnimalUseCase(animalRepositoryRef.current),
+  );
 
   const cargarAnimales = useCallback(async () => {
     try {
       setLoading(true);
-      const animalesObtenidos = await obtenerAnimalesUseCase.execute();
+      console.log("🔄 Cargando animales...");
+      const animalesObtenidos =
+        await obtenerAnimalesUseCaseRef.current.execute();
+      console.log("✅ Animales cargados:", animalesObtenidos.length);
       setAnimales(animalesObtenidos);
       setError(null);
     } catch (err) {
+      console.error("❌ Error cargando animales:", err);
       setError(err instanceof Error ? err.message : "Error al cargar animales");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, []); // ← Vacío porque useRef mantiene las instancias estables
 
   const crearAnimal = useCallback(
     async (animalData: {
@@ -41,22 +51,31 @@ export function useAnimales() {
       madreId?: string | null;
     }) => {
       try {
-        const resultado = await crearAnimalUseCase.execute(animalData);
-        await cargarAnimales(); // Recargar la lista
+        console.log("🔄 Creando animal...", animalData);
+        const resultado =
+          await crearAnimalUseCaseRef.current.execute(animalData);
+        console.log("✅ Animal creado:", resultado);
+
+        // Pequeño delay para asegurar que Supabase procesó
+        setTimeout(() => {
+          cargarAnimales();
+        }, 100);
+
         return resultado;
       } catch (err) {
+        console.error("❌ Error creando animal:", err);
         setError(err instanceof Error ? err.message : "Error al crear animal");
         throw err;
       }
     },
-    [cargarAnimales],
+    [cargarAnimales], // ← Solo depende de cargarAnimales
   );
 
   const eliminarAnimal = useCallback(
     async (id: string) => {
       try {
-        await eliminarAnimalUseCase.execute(id);
-        await cargarAnimales();
+        await eliminarAnimalUseCaseRef.current.execute(id);
+        cargarAnimales();
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Error al eliminar animal",
@@ -70,18 +89,19 @@ export function useAnimales() {
   const buscarAnimales = useCallback(async (termino: string) => {
     try {
       setLoading(true);
-      const resultados = await animalRepository.findBySearchTerm(termino);
+      const resultados =
+        await animalRepositoryRef.current.findBySearchTerm(termino);
       setAnimales(resultados);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al buscar animales");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, []); // ← Vacío porque animalRepositoryRef es estable
 
   useEffect(() => {
     cargarAnimales();
-  }, [cargarAnimales]);
+  }, [cargarAnimales]); // ← Solo se ejecuta cuando cargarAnimales cambia (nunca)
 
   return {
     animales,

@@ -16,16 +16,18 @@ export function AnimalList({ animales, onEliminar, onVerArbol, onEditar }: Anima
   const [eliminando, setEliminando] = useState<string | null>(null);
   const { formatearEdadCorta, formatearEdadCompleta } = useEdadAnimal();
 
+  // ── Calcula la fecha estimada de destete (270 días tras nacimiento) ──────
   const obtenerFechaDestete = (fechaNacimiento: Date): string => {
     const fecha = new Date(fechaNacimiento);
     fecha.setDate(fecha.getDate() + 270);
-    return fecha.toLocaleDateString('es-VE', { 
-      day: '2-digit', 
-      month: 'short', 
-      year: 'numeric' 
+    return fecha.toLocaleDateString('es-VE', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
     });
   };
 
+  // ── Confirma y ejecuta la eliminación del animal ─────────────────────────
   const handleEliminar = async (id: string) => {
     if (confirm('¿Estás seguro de eliminar este animal permanentemente?')) {
       setEliminando(id);
@@ -37,6 +39,7 @@ export function AnimalList({ animales, onEliminar, onVerArbol, onEditar }: Anima
     }
   };
 
+  // ── Alterna la visibilidad del árbol genealógico ─────────────────────────
   const handleVerArbol = (animal: Animal) => {
     if (verArbolId === animal.id) {
       setVerArbolId(null);
@@ -56,11 +59,13 @@ export function AnimalList({ animales, onEliminar, onVerArbol, onEditar }: Anima
     return animales.find(a => a.id === animal.madreId);
   };
 
+  // ── Estado vacío ─────────────────────────────────────────────────────────
   if (animales.length === 0) {
     return (
-      <Card className="text-center py-8">
-        <p className="text-slate-400 font-bold">No hay animales registrados</p>
-        <p className="text-[10px] text-slate-300 mt-2">
+      <Card className="text-center py-12 rounded-2xl shadow-md">
+        <p className="text-4xl mb-3">🐃</p>
+        <p className="text-slate-500 font-bold text-lg">Sin animales registrados</p>
+        <p className="text-sm text-slate-400 mt-2">
           Registra tu primer búfalo en el formulario
         </p>
       </Card>
@@ -68,7 +73,8 @@ export function AnimalList({ animales, onEliminar, onVerArbol, onEditar }: Anima
   }
 
   return (
-    <div className="space-y-3">
+    // gap-4 = espaciado generoso entre tarjetas para no confundir elementos
+    <div className="space-y-4">
       {animales.map(animal => {
         const padre = encontrarPadre(animal);
         const madre = encontrarMadre(animal);
@@ -76,96 +82,229 @@ export function AnimalList({ animales, onEliminar, onVerArbol, onEditar }: Anima
         const estaEliminando = eliminando === animal.id;
         const edadTexto = formatearEdadCorta(animal.fechaNacimiento);
         const edadCompleta = formatearEdadCompleta(animal.fechaNacimiento);
+        const esMacho = animal.sexo === 'Macho';
+        const arbolAbierto = verArbolId === animal.id;
 
         return (
-          <Card key={animal.id} className="hover:shadow-md transition-all">
-            <div className="flex justify-between items-start mb-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h4 className="font-black text-xl text-slate-900">
-                    {animal.nombre}
-                  </h4>
-                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-md ${
-                    animal.sexo === 'Macho' 
-                      ? 'bg-blue-50 text-blue-600' 
-                      : 'bg-pink-50 text-pink-500'
-                  }`}>
-                    {animal.sexo === 'Macho' ? 'M' : 'H'}
-                  </span>
-                </div>
-                <p className="text-[10px] font-bold text-slate-500 uppercase mt-1">
-                  ID: {animal.numeroArete}
-                </p>
-                {/* NUEVO: Mostrar edad */}
-                <p className="text-[9px] text-emerald-600 font-bold mt-0.5 flex items-center gap-1">
-                  <span>🕒</span>
-                  <span>{edadTexto}</span>
-                  <span 
-                    className="text-slate-400 text-[8px] ml-1 cursor-help border-b border-dotted border-slate-300" 
-                    title={edadCompleta}
-                  >
-                    (detalle)
-                  </span>
-                </p>
-              </div>
-              
-              <div className="flex gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => handleVerArbol(animal)}
-                >
-                  🌳 Árbol
-                </Button>
-                {onEditar && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => onEditar(animal)}
-                  >
-                    ✏️
-                  </Button>
-                )}
-              </div>
-            </div>
-            
-            {/* Árbol genealógico */}
-            {verArbolId === animal.id && (
-              <div className="bg-[#F8F9FA] p-4 rounded-2xl mb-4 border border-dashed border-slate-300 animate-in zoom-in-95 duration-300">
-                <p className="text-[9px] font-black text-slate-400 uppercase mb-3">
-                  Genealogía Directa
-                </p>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-slate-400 font-bold">Padre</span>
-                    <span className="font-bold text-slate-800">
-                      {padre ? padre.nombre : '---'}
+          <div
+            key={animal.id}
+            // ── Tarjeta con color de fondo según sexo ──────────────────────
+            // Azul muy suave → machos   |   Rosa suave → hembras
+            // active:scale-[0.98] → feedback táctil inmediato al presionar
+            className={`
+              rounded-2xl shadow-lg border
+              transition-all duration-200
+              hover:-translate-y-0.5 hover:shadow-xl
+              active:scale-[0.98] active:opacity-90
+              overflow-hidden
+              ${esMacho
+                ? 'bg-[#EFF6FF] border-blue-100'
+                : 'bg-[#FDF2F8] border-pink-100'
+              }
+            `}
+            style={{ WebkitTapHighlightColor: 'transparent' }}
+          >
+            {/* ── Franja de color superior según sexo ───────────────────── */}
+            <div
+              className={`h-1.5 w-full ${esMacho ? 'bg-blue-300' : 'bg-pink-300'}`}
+            />
+
+            <div className="p-5">
+              {/* ── Encabezado: nombre + badge de sexo + acciones ─────────── */}
+              <div className="flex justify-between items-start mb-3">
+                {/* Información principal */}
+                <div className="flex-1 min-w-0 mr-3">
+                  {/* Nombre + badge sexo */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="font-black text-2xl text-slate-900 leading-tight">
+                      {animal.nombre}
+                    </h4>
+                    {/*
+                      Badge de sexo: icono + letra
+                      Tamaño aumentado respecto al original para mejor visibilidad
+                    */}
+                    <span
+                      className={`
+                        inline-flex items-center gap-1
+                        text-sm font-black px-3 py-1 rounded-full
+                        ${esMacho
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-pink-100 text-pink-600'
+                        }
+                      `}
+                    >
+                      <span className="text-base">{esMacho ? '🐂' : '🐄'}</span>
+                      <span>{esMacho ? 'M' : 'H'}</span>
                     </span>
                   </div>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-slate-400 font-bold">Madre</span>
-                    <span className="font-bold text-slate-800">
-                      {madre ? madre.nombre : '---'}
+
+                  {/*
+                    Número de arete en fuente monoespaciada
+                    → Los dígitos alinean y se distinguen mejor (0 vs O, 1 vs I)
+                  */}
+                  <p className="text-sm font-bold text-slate-500 uppercase mt-1.5 tracking-wide">
+                    Arete:{' '}
+                    <span className="font-mono text-slate-700 text-base">
+                      {animal.numeroArete}
                     </span>
-                  </div>
+                  </p>
+
+                  {/* Edad con icono y tooltip de fecha exacta */}
+                  <p className="text-sm text-emerald-600 font-bold mt-1.5 flex items-center gap-1.5">
+                    <span>🕒</span>
+                    <span>{edadTexto}</span>
+                    {/* Tooltip accesible con fecha completa al mantener presionado */}
+                    <span
+                      className="text-slate-400 text-xs ml-1 cursor-help border-b border-dotted border-slate-300"
+                      title={edadCompleta}
+                    >
+                      (detalle)
+                    </span>
+                  </p>
+                </div>
+
+                {/* ── Botones de acción ──────────────────────────────────── */}
+                {/*
+                  Mínimo 48×48px (p-3 = 12px padding + contenido)
+                  para dedos adultos con guantes o manos sucias
+                */}
+                <div className="flex gap-2 flex-shrink-0">
+                  {/* Árbol genealógico: siempre visible */}
+                  <button
+                    onClick={() => handleVerArbol(animal)}
+                    title="Ver árbol genealógico"
+                    className={`
+                      min-w-[48px] min-h-[48px] p-3
+                      rounded-xl font-bold text-sm
+                      flex flex-col items-center justify-center gap-0.5
+                      transition-all duration-200
+                      active:scale-95
+                      ${arbolAbierto
+                        ? 'bg-amber-100 text-amber-700 shadow-inner'
+                        : 'bg-white/70 text-slate-600 hover:bg-white shadow-sm hover:shadow'
+                      }
+                    `}
+                  >
+                    <span className="text-xl leading-none">🌳</span>
+                    <span className="text-[10px] leading-none">Árbol</span>
+                  </button>
+
+                  {/* Editar (si el callback está disponible) */}
+                  {onEditar && (
+                    <button
+                      onClick={() => onEditar(animal)}
+                      title="Editar animal"
+                      className="
+                        min-w-[48px] min-h-[48px] p-3
+                        rounded-xl font-bold text-sm
+                        flex flex-col items-center justify-center gap-0.5
+                        bg-white/70 text-slate-600
+                        hover:bg-white shadow-sm hover:shadow
+                        transition-all duration-200 active:scale-95
+                      "
+                    >
+                      <span className="text-xl leading-none">✏️</span>
+                      <span className="text-[10px] leading-none">Editar</span>
+                    </button>
+                  )}
                 </div>
               </div>
-            )}
-            
-            <div className="flex justify-between items-center border-t border-slate-50 pt-3">
-              <p className="text-[9px] font-bold text-slate-400">
-                Destete: <span className="text-slate-600">{fechaDestete}</span>
-              </p>
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={() => animal.id && handleEliminar(animal.id)}
-                disabled={estaEliminando}
+
+              {/* ── Árbol genealógico expandible ──────────────────────────── */}
+              {/*
+                Animación: el árbol aparece con fade + slide hacia abajo
+                Se usa max-height + opacity para transición CSS pura sin JS adicional
+              */}
+              <div
+                className={`
+                  overflow-hidden transition-all duration-300 ease-in-out
+                  ${arbolAbierto ? 'max-h-48 opacity-100 mb-4' : 'max-h-0 opacity-0 mb-0'}
+                `}
               >
-                {estaEliminando ? '...' : 'Eliminar'}
-              </Button>
+                <div className="bg-white/60 backdrop-blur-sm p-4 rounded-2xl border border-dashed border-slate-300 mt-1">
+                  <p className="text-[11px] font-black text-slate-400 uppercase mb-3 tracking-widest">
+                    🌳 Genealogía Directa
+                  </p>
+                  <div className="space-y-2.5">
+                    {/* Padre */}
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">🐂</span>
+                        <span className="text-sm font-bold text-slate-500">Padre</span>
+                      </div>
+                      <span className={`
+                        text-sm font-bold px-3 py-1 rounded-lg
+                        ${padre ? 'text-blue-700 bg-blue-50' : 'text-slate-400 bg-slate-100'}
+                      `}>
+                        {padre ? padre.nombre : 'Sin registro'}
+                      </span>
+                    </div>
+                    {/* Madre */}
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">🐄</span>
+                        <span className="text-sm font-bold text-slate-500">Madre</span>
+                      </div>
+                      <span className={`
+                        text-sm font-bold px-3 py-1 rounded-lg
+                        ${madre ? 'text-pink-600 bg-pink-50' : 'text-slate-400 bg-slate-100'}
+                      `}>
+                        {madre ? madre.nombre : 'Sin registro'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Pie de tarjeta: fecha destete + botón eliminar ─────────── */}
+              <div className={`
+                flex justify-between items-center
+                border-t pt-4
+                ${esMacho ? 'border-blue-100' : 'border-pink-100'}
+              `}>
+                {/* Fecha de destete más visible con icono */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-base">📅</span>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase leading-none">
+                      Destete
+                    </p>
+                    <p className="text-sm font-bold text-slate-700 leading-tight">
+                      {fechaDestete}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Botón eliminar — tamaño táctil mínimo 48px ── */}
+                <button
+                  onClick={() => animal.id && handleEliminar(animal.id)}
+                  disabled={estaEliminando}
+                  className="
+                    min-h-[48px] px-4
+                    rounded-xl font-bold text-sm
+                    flex items-center gap-1.5
+                    bg-red-50 text-red-600
+                    hover:bg-red-100 active:bg-red-200
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                    transition-all duration-200 active:scale-95
+                    border border-red-200
+                  "
+                >
+                  {estaEliminando ? (
+                    <>
+                      <span className="animate-spin inline-block">⏳</span>
+                      <span>Eliminando…</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>🗑️</span>
+                      <span>Eliminar</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
-          </Card>
+          </div>
         );
       })}
     </div>

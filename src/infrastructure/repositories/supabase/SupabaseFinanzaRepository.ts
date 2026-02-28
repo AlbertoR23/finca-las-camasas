@@ -1,33 +1,38 @@
-import { IFinanzaRepository } from '@/src/core/repositories/IFinanzaRepository';
-import { Transaccion } from '@/src/core/entities/Transaccion';
-import { createClient } from '@/utils/supabase/client';
-import { OfflineStorageService } from '../../services/offline/offline-storage.service';
-import { SyncService } from '../../services/offline/sync.service';
+import { IFinanzaRepository } from "@/src/core/repositories/IFinanzaRepository";
+import { Transaccion } from "@/src/core/entities/Transaccion";
+import { createClient } from "@/utils/supabase/client";
+import { OfflineStorageService } from "../../services/offline/offline-storage.service";
 
 export class SupabaseFinanzaRepository implements IFinanzaRepository {
   private supabase = createClient();
   private offlineStorage = OfflineStorageService.getInstance();
-  private syncService = SyncService.getInstance();
 
   private mapToEntity(item: any): Transaccion {
     const fechaStr = item.fecha;
     let fecha: Date;
-    
-    if (typeof fechaStr === 'string') {
-      fecha = new Date(fechaStr + 'T12:00:00');
+
+    if (typeof fechaStr === "string") {
+      fecha = new Date(fechaStr + "T12:00:00");
     } else {
       fecha = new Date(fechaStr);
-      fecha = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate(), 12, 0, 0);
+      fecha = new Date(
+        fecha.getFullYear(),
+        fecha.getMonth(),
+        fecha.getDate(),
+        12,
+        0,
+        0,
+      );
     }
 
-    const descripcion = item.descripcion || '';
-    const tieneUSD = descripcion.includes('[Orig: USD');
-    
-    let monedaOriginal: 'VES' | 'USD' | undefined = undefined;
+    const descripcion = item.descripcion || "";
+    const tieneUSD = descripcion.includes("[Orig: USD");
+
+    let monedaOriginal: "VES" | "USD" | undefined = undefined;
     let montoOriginal: number | undefined = undefined;
-    
+
     if (tieneUSD) {
-      monedaOriginal = 'USD';
+      monedaOriginal = "USD";
       const match = descripcion.match(/Orig: USD ([\d.]+)/);
       if (match && match[1]) {
         montoOriginal = parseFloat(match[1]);
@@ -42,42 +47,49 @@ export class SupabaseFinanzaRepository implements IFinanzaRepository {
       descripcion: descripcion,
       fecha: fecha,
       monedaOriginal: monedaOriginal,
-      montoOriginal: montoOriginal
+      montoOriginal: montoOriginal,
     });
   }
 
   private formatDateForSupabase(date: Date): string {
     const año = date.getFullYear();
-    const mes = String(date.getMonth() + 1).padStart(2, '0');
-    const dia = String(date.getDate()).padStart(2, '0');
+    const mes = String(date.getMonth() + 1).padStart(2, "0");
+    const dia = String(date.getDate()).padStart(2, "0");
     return `${año}-${mes}-${dia}`;
+  }
+
+  private async refreshCache(): Promise<void> {
+    const { data } = await this.supabase.from("contabilidad").select("*");
+    if (data) {
+      await this.offlineStorage.cacheData("contabilidad", data);
+    }
   }
 
   async findAll(): Promise<Transaccion[]> {
     try {
       const { data, error } = await this.supabase
-        .from('contabilidad')
-        .select('*')
-        .order('fecha', { ascending: false });
+        .from("contabilidad")
+        .select("*")
+        .order("fecha", { ascending: false });
 
       if (!error && data) {
-        await this.offlineStorage.cacheData('contabilidad', data);
-        return data.map(item => this.mapToEntity(item));
+        await this.offlineStorage.cacheData("contabilidad", data);
+        return data.map((item) => this.mapToEntity(item));
       }
       throw error;
     } catch (error) {
-      console.log('Offline: usando caché local para finanzas');
-      const cached = await this.offlineStorage.getCachedData('contabilidad');
-      return cached.map(item => this.mapToEntity(item));
+      console.log("📦 Usando caché local para finanzas");
+      const cached = await this.offlineStorage.getCachedData("contabilidad");
+      return cached.map((item) => this.mapToEntity(item));
     }
   }
 
   async findById(id: string): Promise<Transaccion | null> {
     try {
       const { data, error } = await this.supabase
-        .from('contabilidad')
-        .select('*')
-        .eq('id', id)
+        .from("contabilidad")
+        .select("*")
+        .eq("id", id)
         .single();
 
       if (!error && data) {
@@ -85,51 +97,54 @@ export class SupabaseFinanzaRepository implements IFinanzaRepository {
       }
       throw error;
     } catch (error) {
-      const cached = await this.offlineStorage.getCachedData('contabilidad');
-      const found = cached.find(item => item.id === id);
+      const cached = await this.offlineStorage.getCachedData("contabilidad");
+      const found = cached.find((item) => item.id === id);
       return found ? this.mapToEntity(found) : null;
     }
   }
 
-  async findByDateRange(startDate: Date, endDate: Date): Promise<Transaccion[]> {
+  async findByDateRange(
+    startDate: Date,
+    endDate: Date,
+  ): Promise<Transaccion[]> {
     try {
       const { data, error } = await this.supabase
-        .from('contabilidad')
-        .select('*')
-        .gte('fecha', this.formatDateForSupabase(startDate))
-        .lte('fecha', this.formatDateForSupabase(endDate))
-        .order('fecha', { ascending: false });
+        .from("contabilidad")
+        .select("*")
+        .gte("fecha", this.formatDateForSupabase(startDate))
+        .lte("fecha", this.formatDateForSupabase(endDate))
+        .order("fecha", { ascending: false });
 
       if (!error && data) {
-        return data.map(item => this.mapToEntity(item));
+        return data.map((item) => this.mapToEntity(item));
       }
       throw error;
     } catch (error) {
-      const cached = await this.offlineStorage.getCachedData('contabilidad');
-      const filtered = cached.filter(item => {
+      const cached = await this.offlineStorage.getCachedData("contabilidad");
+      const filtered = cached.filter((item) => {
         const fecha = new Date(item.fecha);
         return fecha >= startDate && fecha <= endDate;
       });
-      return filtered.map(item => this.mapToEntity(item));
+      return filtered.map((item) => this.mapToEntity(item));
     }
   }
 
-  async findByTipo(tipo: 'ingreso' | 'gasto'): Promise<Transaccion[]> {
+  async findByTipo(tipo: "ingreso" | "gasto"): Promise<Transaccion[]> {
     try {
       const { data, error } = await this.supabase
-        .from('contabilidad')
-        .select('*')
-        .eq('tipo', tipo)
-        .order('fecha', { ascending: false });
+        .from("contabilidad")
+        .select("*")
+        .eq("tipo", tipo)
+        .order("fecha", { ascending: false });
 
       if (!error && data) {
-        return data.map(item => this.mapToEntity(item));
+        return data.map((item) => this.mapToEntity(item));
       }
       throw error;
     } catch (error) {
-      const cached = await this.offlineStorage.getCachedData('contabilidad');
-      const filtered = cached.filter(item => item.tipo === tipo);
-      return filtered.map(item => this.mapToEntity(item));
+      const cached = await this.offlineStorage.getCachedData("contabilidad");
+      const filtered = cached.filter((item) => item.tipo === tipo);
+      return filtered.map((item) => this.mapToEntity(item));
     }
   }
 
@@ -139,145 +154,156 @@ export class SupabaseFinanzaRepository implements IFinanzaRepository {
       categoria: transaccion.categoria,
       monto: transaccion.monto,
       descripcion: transaccion.descripcion,
-      fecha: this.formatDateForSupabase(transaccion.fecha)
+      fecha: this.formatDateForSupabase(transaccion.fecha),
     };
 
-    if (!navigator.onLine) {
-      await this.offlineStorage.queueOperation({
-        table: 'contabilidad',
-        operation: 'INSERT',
-        data: transaccionData
-      });
+    if (navigator.onLine) {
+      try {
+        const { data, error } = await this.supabase
+          .from("contabilidad")
+          .insert([transaccionData])
+          .select()
+          .single();
 
-      const cached = await this.offlineStorage.getCachedData('contabilidad');
-      cached.push({ ...transaccionData, id: 'temp-' + Date.now(), pending: true });
-      await this.offlineStorage.cacheData('contabilidad', cached);
+        if (error) throw error;
 
-      return transaccion;
+        await this.refreshCache();
+        return this.mapToEntity(data);
+      } catch (error) {
+        console.error("Error online, pasando a offline:", error);
+      }
     }
 
-    try {
-      const { data, error } = await this.supabase
-        .from('contabilidad')
-        .insert([transaccionData])
-        .select()
-        .single();
+    console.log("📥 Encolando transacción para guardar después");
+    await this.offlineStorage.queueOperation({
+      table: "contabilidad",
+      operation: "INSERT",
+      data: transaccionData,
+    });
 
-      if (error) throw new Error(`Error creating transaction: ${error.message}`);
-      
-      await this.offlineStorage.cacheData('contabilidad', []);
-      return this.mapToEntity(data);
-    } catch (error) {
-      await this.offlineStorage.queueOperation({
-        table: 'contabilidad',
-        operation: 'INSERT',
-        data: transaccionData
-      });
-      return transaccion;
-    }
+    const tempId = "temp-" + Date.now();
+    const tempData = { ...transaccionData, id: tempId, pending: true };
+    const cached = await this.offlineStorage.getCachedData("contabilidad");
+    cached.push(tempData);
+    await this.offlineStorage.cacheData("contabilidad", cached);
+
+    return new Transaccion({
+      id: tempId,
+      tipo: transaccion.tipo,
+      categoria: transaccion.categoria,
+      monto: transaccion.monto,
+      descripcion: transaccion.descripcion,
+      fecha: transaccion.fecha,
+      monedaOriginal: transaccion.monedaOriginal,
+      montoOriginal: transaccion.montoOriginal,
+    });
   }
 
-  async update(id: string, transaccionData: Partial<Transaccion>): Promise<Transaccion> {
+  async update(
+    id: string,
+    transaccionData: Partial<Transaccion>,
+  ): Promise<Transaccion> {
     const updateData: any = {};
     if (transaccionData.tipo) updateData.tipo = transaccionData.tipo;
-    if (transaccionData.categoria) updateData.categoria = transaccionData.categoria;
+    if (transaccionData.categoria)
+      updateData.categoria = transaccionData.categoria;
     if (transaccionData.monto) updateData.monto = transaccionData.monto;
-    if (transaccionData.descripcion !== undefined) updateData.descripcion = transaccionData.descripcion;
-    if (transaccionData.fecha) updateData.fecha = this.formatDateForSupabase(transaccionData.fecha);
+    if (transaccionData.descripcion !== undefined)
+      updateData.descripcion = transaccionData.descripcion;
+    if (transaccionData.fecha)
+      updateData.fecha = this.formatDateForSupabase(transaccionData.fecha);
 
-    if (!navigator.onLine) {
-      await this.offlineStorage.queueOperation({
-        table: 'contabilidad',
-        operation: 'UPDATE',
-        data: { id, ...updateData }
-      });
+    if (navigator.onLine) {
+      try {
+        const { data, error } = await this.supabase
+          .from("contabilidad")
+          .update(updateData)
+          .eq("id", id)
+          .select()
+          .single();
 
-      const cached = await this.offlineStorage.getCachedData('contabilidad');
-      const index = cached.findIndex(item => item.id === id);
-      if (index >= 0) {
-        cached[index] = { ...cached[index], ...updateData, pending: true };
-        await this.offlineStorage.cacheData('contabilidad', cached);
+        if (error) throw error;
+
+        await this.refreshCache();
+        return this.mapToEntity(data);
+      } catch (error) {
+        console.error("Error online, pasando a offline:", error);
       }
-
-      return new Transaccion({
-        id,
-        tipo: updateData.tipo || 'gasto',
-        categoria: updateData.categoria || '',
-        monto: updateData.monto || 0,
-        descripcion: updateData.descripcion || '',
-        fecha: new Date()
-      });
     }
 
-    try {
-      const { data, error } = await this.supabase
-        .from('contabilidad')
-        .update(updateData)
-        .eq('id', id)
-        .select()
-        .single();
+    await this.offlineStorage.queueOperation({
+      table: "contabilidad",
+      operation: "UPDATE",
+      data: { id, ...updateData },
+    });
 
-      if (error) throw new Error(`Error updating transaction: ${error.message}`);
-      
-      await this.offlineStorage.cacheData('contabilidad', []);
-      return this.mapToEntity(data);
-    } catch (error) {
-      await this.offlineStorage.queueOperation({
-        table: 'contabilidad',
-        operation: 'UPDATE',
-        data: { id, ...updateData }
-      });
-      throw error;
+    const cached = await this.offlineStorage.getCachedData("contabilidad");
+    const index = cached.findIndex((item) => item.id === id);
+    if (index >= 0) {
+      cached[index] = { ...cached[index], ...updateData, pending: true };
+      await this.offlineStorage.cacheData("contabilidad", cached);
     }
+
+    return new Transaccion({
+      id,
+      tipo: updateData.tipo || "gasto",
+      categoria: updateData.categoria || "",
+      monto: updateData.monto || 0,
+      descripcion: updateData.descripcion || "",
+      fecha: new Date(),
+    });
   }
 
   async delete(id: string): Promise<void> {
-    if (!navigator.onLine) {
-      await this.offlineStorage.queueOperation({
-        table: 'contabilidad',
-        operation: 'DELETE',
-        data: { id }
-      });
+    if (navigator.onLine) {
+      try {
+        const { error } = await this.supabase
+          .from("contabilidad")
+          .delete()
+          .eq("id", id);
 
-      const cached = await this.offlineStorage.getCachedData('contabilidad');
-      const filtered = cached.filter(item => item.id !== id);
-      await this.offlineStorage.cacheData('contabilidad', filtered);
-      return;
+        if (error) throw error;
+
+        await this.refreshCache();
+        return;
+      } catch (error) {
+        console.error("Error online, pasando a offline:", error);
+      }
     }
 
-    try {
-      const { error } = await this.supabase
-        .from('contabilidad')
-        .delete()
-        .eq('id', id);
+    await this.offlineStorage.queueOperation({
+      table: "contabilidad",
+      operation: "DELETE",
+      data: { id },
+    });
 
-      if (error) throw new Error(`Error deleting transaction: ${error.message}`);
-      
-      await this.offlineStorage.cacheData('contabilidad', []);
-    } catch (error) {
-      await this.offlineStorage.queueOperation({
-        table: 'contabilidad',
-        operation: 'DELETE',
-        data: { id }
-      });
-    }
+    const cached = await this.offlineStorage.getCachedData("contabilidad");
+    const filtered = cached.filter((item) => item.id !== id);
+    await this.offlineStorage.cacheData("contabilidad", filtered);
   }
 
-  async getBalance(): Promise<{ ingresos: number; gastos: number; neto: number }> {
+  async getBalance(): Promise<{
+    ingresos: number;
+    gastos: number;
+    neto: number;
+  }> {
     const transacciones = await this.findAll();
-    
-    const balance = transacciones.reduce((acc, t) => {
-      if (t.esIngreso()) {
-        acc.ingresos += t.monto;
-      } else {
-        acc.gastos += t.monto;
-      }
-      return acc;
-    }, { ingresos: 0, gastos: 0 });
+
+    const balance = transacciones.reduce(
+      (acc, t) => {
+        if (t.esIngreso()) {
+          acc.ingresos += t.monto;
+        } else {
+          acc.gastos += t.monto;
+        }
+        return acc;
+      },
+      { ingresos: 0, gastos: 0 },
+    );
 
     return {
       ...balance,
-      neto: balance.ingresos - balance.gastos
+      neto: balance.ingresos - balance.gastos,
     };
   }
 }

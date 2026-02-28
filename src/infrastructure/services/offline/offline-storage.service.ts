@@ -1,7 +1,7 @@
 export interface PendingOperation {
   id?: number;
   table: string;
-  operation: 'INSERT' | 'UPDATE' | 'DELETE';
+  operation: "INSERT" | "UPDATE" | "DELETE";
   data: any;
   timestamp: number;
   synced: boolean;
@@ -9,7 +9,7 @@ export interface PendingOperation {
 
 export class OfflineStorageService {
   private static instance: OfflineStorageService;
-  private dbName = 'FincaOfflineDB';
+  private dbName = "FincaOfflineDB";
   private dbVersion = 1;
   private db: IDBDatabase | null = null;
 
@@ -34,49 +34,56 @@ export class OfflineStorageService {
 
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
-        
+
         // Tabla para operaciones pendientes
-        if (!db.objectStoreNames.contains('pending_operations')) {
-          const store = db.createObjectStore('pending_operations', { 
-            keyPath: 'id', 
-            autoIncrement: true 
+        if (!db.objectStoreNames.contains("pending_operations")) {
+          const store = db.createObjectStore("pending_operations", {
+            keyPath: "id",
+            autoIncrement: true,
           });
-          store.createIndex('synced', 'synced', { unique: false });
-          store.createIndex('timestamp', 'timestamp', { unique: false });
+          store.createIndex("synced", "synced", { unique: false });
+          store.createIndex("timestamp", "timestamp", { unique: false });
         }
 
         // Tablas para datos cacheados
-        if (!db.objectStoreNames.contains('animales')) {
-          const animalStore = db.createObjectStore('animales', { keyPath: 'id' });
-          animalStore.createIndex('nombre', 'nombre', { unique: false });
+        if (!db.objectStoreNames.contains("animales")) {
+          const animalStore = db.createObjectStore("animales", {
+            keyPath: "id",
+          });
+          animalStore.createIndex("nombre", "nombre", { unique: false });
         }
 
-        if (!db.objectStoreNames.contains('contabilidad')) {
-          db.createObjectStore('contabilidad', { keyPath: 'id' });
+        if (!db.objectStoreNames.contains("contabilidad")) {
+          db.createObjectStore("contabilidad", { keyPath: "id" });
         }
 
-        if (!db.objectStoreNames.contains('registros_diarios')) {
-          db.createObjectStore('registros_diarios', { keyPath: 'id' });
+        if (!db.objectStoreNames.contains("registros_diarios")) {
+          db.createObjectStore("registros_diarios", { keyPath: "id" });
         }
 
-        if (!db.objectStoreNames.contains('vacunas')) {
-          db.createObjectStore('vacunas', { keyPath: 'id' });
+        if (!db.objectStoreNames.contains("vacunas")) {
+          db.createObjectStore("vacunas", { keyPath: "id" });
         }
       };
     });
   }
 
-  async queueOperation(operation: Omit<PendingOperation, 'id' | 'timestamp' | 'synced'>): Promise<void> {
+  async queueOperation(
+    operation: Omit<PendingOperation, "id" | "timestamp" | "synced">,
+  ): Promise<void> {
     await this.initDB();
-    
+
     return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['pending_operations'], 'readwrite');
-      const store = transaction.objectStore('pending_operations');
-      
+      const transaction = this.db!.transaction(
+        ["pending_operations"],
+        "readwrite",
+      );
+      const store = transaction.objectStore("pending_operations");
+
       const request = store.add({
         ...operation,
         timestamp: Date.now(),
-        synced: false
+        synced: false,
       });
 
       request.onsuccess = () => resolve();
@@ -86,14 +93,17 @@ export class OfflineStorageService {
 
   async getPendingOperations(): Promise<PendingOperation[]> {
     await this.initDB();
-    
+
     return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['pending_operations'], 'readonly');
-      const store = transaction.objectStore('pending_operations');
-      const index = store.index('synced');
-      
+      const transaction = this.db!.transaction(
+        ["pending_operations"],
+        "readonly",
+      );
+      const store = transaction.objectStore("pending_operations");
+      const index = store.index("synced");
+
       // CORREGIDO: Usar IDBKeyRange.only(0) para false
-      const range = IDBKeyRange.only(0); // 0 = false
+      const range = IDBKeyRange.only(false);
       const request = index.getAll(range);
 
       request.onsuccess = () => resolve(request.result);
@@ -103,13 +113,16 @@ export class OfflineStorageService {
 
   async markOperationAsSynced(id: number): Promise<void> {
     await this.initDB();
-    
+
     return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['pending_operations'], 'readwrite');
-      const store = transaction.objectStore('pending_operations');
-      
+      const transaction = this.db!.transaction(
+        ["pending_operations"],
+        "readwrite",
+      );
+      const store = transaction.objectStore("pending_operations");
+
       const getRequest = store.get(id);
-      
+
       getRequest.onsuccess = () => {
         const operation = getRequest.result;
         if (operation) {
@@ -121,7 +134,7 @@ export class OfflineStorageService {
           resolve();
         }
       };
-      
+
       getRequest.onerror = () => reject(getRequest.error);
     });
   }
@@ -130,17 +143,17 @@ export class OfflineStorageService {
     if (!this.db) {
       await this.initDB();
     }
-    
+
     return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction([table], 'readwrite');
+      const transaction = this.db!.transaction([table], "readwrite");
       const store = transaction.objectStore(table);
-      
+
       // Limpiar caché anterior
       store.clear();
-      
+
       // Guardar nuevos datos
       if (data && data.length > 0) {
-        data.forEach(item => {
+        data.forEach((item) => {
           store.add(item);
         });
       }
@@ -154,9 +167,9 @@ export class OfflineStorageService {
     if (!this.db) {
       await this.initDB();
     }
-    
+
     return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction([table], 'readonly');
+      const transaction = this.db!.transaction([table], "readonly");
       const store = transaction.objectStore(table);
       const request = store.getAll();
 
@@ -169,12 +182,15 @@ export class OfflineStorageService {
     if (!this.db) {
       await this.initDB();
     }
-    
+
     return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['pending_operations'], 'readwrite');
-      const store = transaction.objectStore('pending_operations');
-      const index = store.index('synced');
-      
+      const transaction = this.db!.transaction(
+        ["pending_operations"],
+        "readwrite",
+      );
+      const store = transaction.objectStore("pending_operations");
+      const index = store.index("synced");
+
       // CORREGIDO: Usar IDBKeyRange.only(1) para true
       const range = IDBKeyRange.only(1); // 1 = true
       const request = index.openCursor(range);
@@ -201,15 +217,21 @@ export class OfflineStorageService {
     if (!this.db) {
       await this.initDB();
     }
-    
-    const tables = ['pending_operations', 'animales', 'contabilidad', 'registros_diarios', 'vacunas'];
-    
+
+    const tables = [
+      "pending_operations",
+      "animales",
+      "contabilidad",
+      "registros_diarios",
+      "vacunas",
+    ];
+
     for (const table of tables) {
       await new Promise<void>((resolve, reject) => {
-        const transaction = this.db!.transaction([table], 'readwrite');
+        const transaction = this.db!.transaction([table], "readwrite");
         const store = transaction.objectStore(table);
         const request = store.clear();
-        
+
         request.onsuccess = () => resolve();
         request.onerror = () => reject(request.error);
       });

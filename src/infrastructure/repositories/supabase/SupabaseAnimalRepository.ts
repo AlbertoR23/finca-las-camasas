@@ -2,30 +2,31 @@ import { IAnimalRepository } from "@/src/core/repositories/IAnimalRepository";
 import { Animal } from "@/src/core/entities/Animal";
 import { createClient } from "@/utils/supabase/client";
 import { OfflineStorageService } from "../../services/offline/offline-storage.service";
-import { SyncService } from "../../services/offline/sync.service";
 
 export class SupabaseAnimalRepository implements IAnimalRepository {
   private supabase = createClient();
   private offlineStorage = OfflineStorageService.getInstance();
-  private syncService = SyncService.getInstance();
 
+  /**
+   * Obtiene todos los animales priorizando la red,
+   * pero cae al caché local instantáneamente si hay error.
+   */
   async findAll(): Promise<Animal[]> {
     try {
-      // Intentar obtener de Supabase
       const { data, error } = await this.supabase
         .from("animales")
         .select("*")
         .order("nombre");
 
-      if (!error && data) {
-        // Guardar en caché para offline
+      if (error) throw error;
+
+      if (data) {
         await this.offlineStorage.cacheData("animales", data);
         return data.map((item) => Animal.fromSupabase(item));
       }
-      throw error;
+      return [];
     } catch (error) {
-      console.log("Offline: usando caché local para animales");
-      // Si falla, usar caché local
+      console.warn("⚠️ Modo Offline: Cargando animales desde IndexedDB");
       const cached = await this.offlineStorage.getCachedData("animales");
       return cached.map((item) => Animal.fromSupabase(item));
     }
@@ -39,12 +40,9 @@ export class SupabaseAnimalRepository implements IAnimalRepository {
         .eq("id", id)
         .single();
 
-      if (!error && data) {
-        return Animal.fromSupabase(data);
-      }
-      throw error;
+      if (error) throw error;
+      return data ? Animal.fromSupabase(data) : null;
     } catch (error) {
-      // Buscar en caché local
       const cached = await this.offlineStorage.getCachedData("animales");
       const found = cached.find((item) => item.id === id);
       return found ? Animal.fromSupabase(found) : null;
@@ -58,12 +56,9 @@ export class SupabaseAnimalRepository implements IAnimalRepository {
         .select("*")
         .or(`nombre.ilike.%${term}%,numero_arete.ilike.%${term}%`);
 
-      if (!error && data) {
-        return data.map((item) => Animal.fromSupabase(item));
-      }
-      throw error;
+      if (error) throw error;
+      return data ? data.map((item) => Animal.fromSupabase(item)) : [];
     } catch (error) {
-      // Filtrar en caché local
       const cached = await this.offlineStorage.getCachedData("animales");
       const filtered = cached.filter(
         (item) =>
@@ -74,179 +69,139 @@ export class SupabaseAnimalRepository implements IAnimalRepository {
     }
   }
 
+  /**
+   * Crea un animal. Si falla la red, lo guarda localmente
+   * y lo encola para sincronización posterior.
+   */
   async create(animal: Animal): Promise<Animal> {
     const animalData = animal.toJSON();
 
-    if (!navigator.onLine) {
-      // Modo offline: encolar operación
-      await this.offlineStorage.queueOperation({
-        table: "animales",
-        operation: "INSERT",
-        data: animalData,
-      });
-
-      // Guardar en caché local
-      const cached = await this.offlineStorage.getCachedData("animales");
-      cached.push({ ...animalData, pending: true });
-      await this.offlineStorage.cacheData("animales", cached);
-
-      return animal;
-    }
-
-    // Modo online: ejecutar directamente
     try {
+      // Intentar operación online directamente
       const { data, error } = await this.supabase
         .from("animales")
         .insert([animalData])
         .select()
         .single();
 
-      if (error) throw new Error(`Error creating animal: ${error.message}`);
+      if (error) throw error;
 
-      // ✅ CORREGIDO: En lugar de vaciar el caché, obtener los datos actualizados
-      const { data: allData } = await this.supabase
-        .from("animales")
-        .select("*")
-        .order("nombre");
-
-      if (allData) {
-        await this.offlineStorage.cacheData("animales", allData);
-      }
+      // Actualización incremental del caché (sin descargar todo de nuevo)
+      const cached = await this.offlineStorage.getCachedData("animales");
+      cached.push(data);
+      await this.offlineStorage.cacheData("animales", cached);
 
       return Animal.fromSupabase(data);
     } catch (error) {
-      // Si falla la conexión durante la operación, encolar
+      console.error("🌐 Error de red, guardando animal offline...");
+
+      // Generar un ID temporal si no tiene uno para IndexedDB
+      const offlineId = animalData.id || crypto.randomUUID();
+      const localData = { ...animalData, id: offlineId, pending: true };
+
+      // 1. Encolar operación para SyncService
       await this.offlineStorage.queueOperation({
         table: "animales",
         operation: "INSERT",
-        data: animalData,
+        data: localData,
       });
-      return animal;
+
+      // 2. Guardar en caché local para que aparezca en la lista
+      const cached = await this.offlineStorage.getCachedData("animales");
+      cached.push(localData);
+      await this.offlineStorage.cacheData("animales", cached);
+
+      return Animal.fromSupabase(localData);
     }
   }
 
   async update(id: string, animalData: Partial<Animal>): Promise<Animal> {
-    const updateData: {
-      nombre?: string;
-      numero_arete?: string;
-      fecha_nacimiento?: string;
-      sexo?: string;
-      padre_id?: string | null;
-      madre_id?: string | null;
-    } = {};
-    if (animalData.nombre) updateData.nombre = animalData.nombre;
-    if (animalData.numeroArete)
-      updateData.numero_arete = animalData.numeroArete;
-    if (animalData.fechaNacimiento) {
-      const fecha = animalData.fechaNacimiento;
-      const año = fecha.getFullYear();
-      const mes = String(fecha.getMonth() + 1).padStart(2, "0");
-      const dia = String(fecha.getDate()).padStart(2, "0");
-      updateData.fecha_nacimiento = `${año}-${mes}-${dia}`;
-    }
-    if (animalData.sexo) updateData.sexo = animalData.sexo;
-    if (animalData.padreId !== undefined)
-      updateData.padre_id = animalData.padreId;
-    if (animalData.madreId !== undefined)
-      updateData.madre_id = animalData.madreId;
-
-    if (!navigator.onLine) {
-      // Modo offline
-      await this.offlineStorage.queueOperation({
-        table: "animales",
-        operation: "UPDATE",
-        data: { id, ...updateData },
-      });
-
-      // Actualizar caché local
-      const cached = await this.offlineStorage.getCachedData("animales");
-      const index = cached.findIndex((item) => item.id === id);
-      if (index >= 0) {
-        cached[index] = { ...cached[index], ...updateData, pending: true };
-        await this.offlineStorage.cacheData("animales", cached);
-      }
-
-      return new Animal({
-        id,
-        nombre: updateData.nombre || "",
-        numeroArete: updateData.numero_arete || "",
-        fechaNacimiento: new Date(),
-        sexo: (updateData.sexo as "Macho" | "Hembra") || "Hembra",
-        padreId: updateData.padre_id,
-        madreId: updateData.madre_id,
-      });
-    }
+    const updatePayload = this.mapToSupabaseFormat(animalData);
 
     try {
       const { data, error } = await this.supabase
         .from("animales")
-        .update(updateData)
+        .update(updatePayload)
         .eq("id", id)
         .select()
         .single();
 
-      if (error) throw new Error(`Error updating animal: ${error.message}`);
+      if (error) throw error;
 
-      // ✅ CORREGIDO: Actualizar caché con datos frescos
-      const { data: allData } = await this.supabase
-        .from("animales")
-        .select("*")
-        .order("nombre");
-
-      if (allData) {
-        await this.offlineStorage.cacheData("animales", allData);
-      }
+      // Actualizar caché local de forma eficiente
+      await this.updateLocalCache(id, data);
 
       return Animal.fromSupabase(data);
     } catch (error) {
+      console.warn("🔄 Encolando actualización offline para animal:", id);
+
       await this.offlineStorage.queueOperation({
         table: "animales",
         operation: "UPDATE",
-        data: { id, ...updateData },
+        data: { id, ...updatePayload },
       });
-      throw error;
+
+      await this.updateLocalCache(id, { ...updatePayload, pending: true });
+
+      // Retornar entidad local para no romper la UI
+      const cached = await this.offlineStorage.getCachedData("animales");
+      const updated = cached.find((a) => a.id === id);
+      return Animal.fromSupabase(updated);
     }
   }
 
   async delete(id: string): Promise<void> {
-    if (!navigator.onLine) {
-      // Modo offline
-      await this.offlineStorage.queueOperation({
-        table: "animales",
-        operation: "DELETE",
-        data: { id },
-      });
-
-      // Actualizar caché local
-      const cached = await this.offlineStorage.getCachedData("animales");
-      const filtered = cached.filter((item) => item.id !== id);
-      await this.offlineStorage.cacheData("animales", filtered);
-      return;
-    }
-
     try {
       const { error } = await this.supabase
         .from("animales")
         .delete()
         .eq("id", id);
 
-      if (error) throw new Error(`Error deleting animal: ${error.message}`);
+      if (error) throw error;
 
-      // ✅ CORREGIDO: Actualizar caché después de eliminar
-      const { data: allData } = await this.supabase
-        .from("animales")
-        .select("*")
-        .order("nombre");
-
-      if (allData) {
-        await this.offlineStorage.cacheData("animales", allData);
-      }
+      // Remover del caché local
+      const cached = await this.offlineStorage.getCachedData("animales");
+      const filtered = cached.filter((item) => item.id !== id);
+      await this.offlineStorage.cacheData("animales", filtered);
     } catch (error) {
+      console.warn("🗑️ Encolando eliminación offline para:", id);
+
       await this.offlineStorage.queueOperation({
         table: "animales",
         operation: "DELETE",
         data: { id },
       });
+
+      const cached = await this.offlineStorage.getCachedData("animales");
+      const filtered = cached.filter((item) => item.id !== id);
+      await this.offlineStorage.cacheData("animales", filtered);
     }
+  }
+
+  // --- MÉTODOS PRIVADOS DE AYUDA ---
+
+  private async updateLocalCache(id: string, newData: any) {
+    const cached = await this.offlineStorage.getCachedData("animales");
+    const index = cached.findIndex((item) => item.id === id);
+    if (index >= 0) {
+      cached[index] = { ...cached[index], ...newData };
+      await this.offlineStorage.cacheData("animales", cached);
+    }
+  }
+
+  private mapToSupabaseFormat(animalData: Partial<Animal>) {
+    const mapped: any = {};
+    if (animalData.nombre) mapped.nombre = animalData.nombre;
+    if (animalData.numeroArete) mapped.numero_arete = animalData.numeroArete;
+    if (animalData.sexo) mapped.sexo = animalData.sexo;
+    if (animalData.padreId !== undefined) mapped.padre_id = animalData.padreId;
+    if (animalData.madreId !== undefined) mapped.madre_id = animalData.madreId;
+
+    if (animalData.fechaNacimiento) {
+      mapped.fecha_nacimiento = animalData.fechaNacimiento
+        .toISOString()
+        .split("T")[0];
+    }
+    return mapped;
   }
 }

@@ -51,24 +51,26 @@ export function useAnimales() {
       madreId?: string | null;
     }) => {
       try {
-        console.log("🔄 Creando animal...", animalData);
-        const resultado =
+        setLoading(true);
+        console.log("🔄 Ejecutando caso de uso de creación...");
+
+        const nuevoAnimal =
           await crearAnimalUseCaseRef.current.execute(animalData);
-        console.log("✅ Animal creado:", resultado);
 
-        // Pequeño delay para asegurar que Supabase procesó
-        setTimeout(() => {
-          cargarAnimales();
-        }, 100);
+        // ✅ ACTUALIZACIÓN OPTIMISTA: No esperamos al reload, lo metemos directo al estado
+        setAnimales((prev) => [...prev, nuevoAnimal as Animal]);
 
-        return resultado;
+        console.log("✅ Interfaz actualizada con el nuevo animal");
+        return nuevoAnimal;
       } catch (err) {
-        console.error("❌ Error creando animal:", err);
+        console.error("❌ Error en el hook al crear animal:", err);
         setError(err instanceof Error ? err.message : "Error al crear animal");
         throw err;
+      } finally {
+        setLoading(false);
       }
     },
-    [cargarAnimales], // ← Solo depende de cargarAnimales
+    [], // Eliminamos cargarAnimales de las dependencias para evitar renders infinitos
   );
 
   const eliminarAnimal = useCallback(

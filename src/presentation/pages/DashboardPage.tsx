@@ -20,6 +20,7 @@ import { VacunaList } from "../components/features/salud/VacunaList/VacunaList";
 import { FinanzaForm } from "../components/features/finanzas/FinanzaForm/FinanzaForm";
 import { GraficoProduccion } from "../components/features/produccion/GraficoProduccion/GraficoProduccion";
 import { ThemeToggle } from "../components/common/ThemeToggle/ThemeToggle"; // ← NUEVO
+import SyncIndicator from "../components/common/SyncIndicator";
 
 type TabType = "inicio" | "animales" | "produccion" | "salud" | "finanzas";
 
@@ -72,67 +73,71 @@ export default function DashboardPage() {
        * ════════════════════════════════════════════════════════
        */}
       <header
-        className="sticky top-0 z-20 text-white px-6 py-4 shadow-[0_8px_32px_rgba(27,67,50,0.35)]"
-        style={{
-          background:
-            "linear-gradient(135deg, #1B4332 0%, #2D6A4F 60%, #40916C 100%)",
-          borderRadius: "0 0 2rem 2rem",
-        }}
-      >
-        {/* Textura sutil de fondo */}
-        <div
-          className="absolute inset-0 opacity-10 pointer-events-none"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(255,255,255,0.15) 8px, rgba(255,255,255,0.15) 9px)",
-            borderRadius: "0 0 2rem 2rem",
-          }}
-        />
-
-        <div className="max-w-md mx-auto flex justify-between items-center relative">
-          {/* ── Identidad de la finca ── */}
-          <div>
-            {/* [TEXTO CAMBIADO] "SISTEMA DATAVE" → saludo personalizado */}
-            <p className="text-green-200 text-[9px] font-semibold uppercase tracking-[0.25em] mb-0.5 opacity-90">
-              Bienvenido, Leonardo Marcano
-            </p>
-            {/* [TEXTO CAMBIADO] "BÚFALOS" → nombre de la finca */}
-            <h1
-              className="text-3xl font-black tracking-tight leading-none"
-              style={{ textShadow: "0 2px 8px rgba(0,0,0,0.25)" }}
+              className="sticky top-0 z-20 text-white px-6 py-4 shadow-[0_8px_32px_rgba(27,67,50,0.35)]"
+              style={{
+                background:
+                  "linear-gradient(135deg, #1B4332 0%, #2D6A4F 60%, #40916C 100%)",
+                borderRadius: "0 0 2rem 2rem",
+              }}
             >
-              Finca las Camasas
-            </h1>
-          </div>
+              {/* Textura sutil de fondo */}
+              <div
+                className="absolute inset-0 opacity-10 pointer-events-none"
+                style={{
+                  backgroundImage:
+                    "repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(255,255,255,0.15) 8px, rgba(255,255,255,0.15) 9px)",
+                  borderRadius: "0 0 2rem 2rem",
+                }}
+              />
 
-          {/* ── Card tasa BCV y toggle de tema ── */}
-          <div className="flex items-center gap-2">
-            <ThemeToggle /> {/* ← NUEVO */}
-            <div className="bg-black/20 backdrop-blur-sm px-3 py-2 rounded-xl border border-white/20 text-center flex flex-col items-center gap-0.5">
-              {/* Indicador online/offline */}
-              <span className="flex items-center gap-1">
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    tasa.origen === "api"
-                      ? "bg-green-400 animate-pulse"
-                      : "bg-orange-400"
-                  }`}
-                />
-                <p
-                  className={`text-[7px] font-black uppercase tracking-widest ${
-                    tasa.origen === "api" ? "text-green-300" : "text-orange-300"
-                  }`}
-                >
-                  {tasa.origen === "api" ? "BCV Live" : "Offline"}
-                </p>
-              </span>
-              <p className="text-sm font-bold leading-none text-white">
-                Bs {tasa.value.toFixed(2)}
-              </p>
-            </div>
-          </div>
-        </div>
-      </header>
+              <div className="max-w-md mx-auto flex justify-between items-center relative">
+                {/* ── Identidad de la finca ── */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-green-200 text-[9px] font-semibold uppercase tracking-[0.25em] opacity-90 truncate">
+                      Bienvenido, Leonardo Marcano
+                    </p>
+                    {/* ✅ Nube de sincronización */}
+                    <div className="shrink-0">
+                      <SyncIndicator />
+                    </div>
+                  </div>
+
+                  <h1
+                    className="text-2xl sm:text-3xl font-black tracking-tight leading-none truncate"
+                    style={{ textShadow: "0 2px 8px rgba(0,0,0,0.25)" }}
+                  >
+                    Finca las Camasas
+                  </h1>
+                </div>
+
+                {/* ── Card tasa BCV y toggle de tema ── */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <ThemeToggle />
+                  <div className="bg-black/20 backdrop-blur-sm px-3 py-2 rounded-xl border border-white/20 text-center flex flex-col items-center gap-0.5">
+                    <span className="flex items-center gap-1">
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          tasa.origen === "api"
+                            ? "bg-green-400 animate-pulse"
+                            : "bg-orange-400"
+                        }`}
+                      />
+                      <p
+                        className={`text-[7px] font-black uppercase tracking-widest ${
+                          tasa.origen === "api" ? "text-green-300" : "text-orange-300"
+                        }`}
+                      >
+                        {tasa.origen === "api" ? "BCV Live" : "Offline"}
+                      </p>
+                    </span>
+                    <p className="text-sm font-bold leading-none text-white">
+                      Bs {tasa.value.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </header>
 
       {/* ... resto del código sin cambios ... */}
       <div className="max-w-md mx-auto px-4 pt-12 -mt-8 space-y-4 relative z-10">
@@ -213,8 +218,10 @@ export default function DashboardPage() {
           <div className="space-y-4 animate-in slide-in-from-right-4 duration-500">
             <div className="bg-[var(--card)] p-6 rounded-[2.5rem] border border-[var(--border)] shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
               <h3 className="text-[10px] font-black mb-4 text-[var(--primary)] uppercase tracking-widest flex items-center gap-2">
-                <span className="bg-[var(--primary)]/10 p-1.5 rounded-lg">🐃</span> Nuevo
-                Registro
+                <span className="bg-[var(--primary)]/10 p-1.5 rounded-lg">
+                  🐃
+                </span>{" "}
+                Nuevo Registro
               </h3>
               <AnimalForm
                 animales={animales}
@@ -225,7 +232,9 @@ export default function DashboardPage() {
             </div>
 
             <div className="relative">
-              <span className="absolute left-4 top-4 text-[var(--muted-foreground)]">🔍</span>
+              <span className="absolute left-4 top-4 text-[var(--muted-foreground)]">
+                🔍
+              </span>
               <input
                 placeholder="Buscar por nombre o arete..."
                 className="w-full p-4 pl-12 rounded-2xl bg-[var(--card)] border border-[var(--border)] text-[var(--foreground)] font-bold placeholder:text-[var(--muted-foreground)] focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--primary)]/20 outline-none transition-all shadow-sm"
@@ -247,8 +256,8 @@ export default function DashboardPage() {
           <div className="space-y-4 animate-in slide-in-from-right-4 duration-500">
             <div className="bg-[var(--card)] p-6 rounded-[2.5rem] border border-[var(--border)] shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
               <h2 className="text-[10px] font-black mb-4 text-[var(--info)] uppercase tracking-widest text-center flex justify-center gap-2">
-                <span className="bg-[var(--info)]/10 p-1 rounded-lg">🥛</span> Control
-                Diario
+                <span className="bg-[var(--info)]/10 p-1 rounded-lg">🥛</span>{" "}
+                Control Diario
               </h2>
               <RegistroProduccionForm
                 animales={animales}
@@ -297,8 +306,10 @@ export default function DashboardPage() {
           <div className="space-y-4 animate-in slide-in-from-right-4 duration-500">
             <div className="bg-[var(--card)] p-6 rounded-[2.5rem] border border-[var(--border)] shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
               <h2 className="text-[10px] font-black mb-4 text-purple-600 dark:text-purple-400 uppercase tracking-widest text-center flex justify-center gap-2">
-                <span className="bg-purple-100 dark:bg-purple-900/30 p-1 rounded-lg">💉</span> Plan
-                Sanitario
+                <span className="bg-purple-100 dark:bg-purple-900/30 p-1 rounded-lg">
+                  💉
+                </span>{" "}
+                Plan Sanitario
               </h2>
               <VacunaForm animales={animales} onSubmit={crearVacuna} />
             </div>
@@ -319,8 +330,10 @@ export default function DashboardPage() {
           <div className="space-y-4 animate-in slide-in-from-right-4 duration-500">
             <div className="bg-[var(--card)] p-6 rounded-[2.5rem] border border-[var(--border)] shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
               <h2 className="text-[10px] font-black mb-4 text-amber-600 dark:text-amber-400 uppercase tracking-widest text-center flex justify-center gap-2">
-                <span className="bg-amber-100 dark:bg-amber-900/30 p-1 rounded-lg">💰</span> Caja
-                Chica
+                <span className="bg-amber-100 dark:bg-amber-900/30 p-1 rounded-lg">
+                  💰
+                </span>{" "}
+                Caja Chica
               </h2>
               <FinanzaForm tasaBCV={tasa.value} onSubmit={crearTransaccion} />
             </div>

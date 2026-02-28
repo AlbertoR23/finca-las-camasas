@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { BCVService } from "@/src/infrastructure/services/bcv/bcv.service";
-
+export const dynamic = "force-static";
 export async function GET() {
   try {
     const bcvService = BCVService.getInstance();

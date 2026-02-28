@@ -91,24 +91,12 @@ export class OfflineStorageService {
     });
   }
 
-  async getPendingOperations(): Promise<PendingOperation[]> {
-    await this.initDB();
-
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(
-        ["pending_operations"],
-        "readonly",
-      );
-      const store = transaction.objectStore("pending_operations");
-      const index = store.index("synced");
-
-      // CORREGIDO: Usar IDBKeyRange.only(0) para false
-      const range = IDBKeyRange.only(false);
-      const request = index.getAll(range);
-
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
+  async getPendingOperations(): Promise<any[]> {
+    const db = await this.getDB();
+    // ✅ MEJORA: En lugar de usar IDBKeyRange.only(false) que puede fallar si el índice es estricto,
+    // simplemente obtenemos todos y filtramos en memoria, lo cual es más seguro para 4GB de RAM.
+    const allOps = await db.getAll('pending_operations');
+    return allOps.filter(op => op.synced === false || op.synced === 0);
   }
 
   async markOperationAsSynced(id: number): Promise<void> {

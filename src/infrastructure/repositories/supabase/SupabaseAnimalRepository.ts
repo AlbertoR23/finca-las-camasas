@@ -81,7 +81,7 @@ export class SupabaseAnimalRepository implements IAnimalRepository {
     const nuevoRegistro = {
       id: idTemporal,
       nombre: animalData.nombre,
-      numero_arete: animalData.numero_arete,
+      numero_arete: animalData.numeroArete,
       sexo: animalData.sexo,
       fecha_nacimiento: animalData.fecha_nacimiento || new Date().toISOString(),
       padre_id: animalData.padre_id || null,

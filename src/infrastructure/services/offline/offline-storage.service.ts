@@ -93,10 +93,13 @@ export class OfflineStorageService {
 
   async getPendingOperations(): Promise<any[]> {
     const db = await this.getDB();
-    // ✅ MEJORA: En lugar de usar IDBKeyRange.only(false) que puede fallar si el índice es estricto,
-    // simplemente obtenemos todos y filtramos en memoria, lo cual es más seguro para 4GB de RAM.
-    const allOps = await db.getAll('pending_operations');
-    return allOps.filter(op => op.synced === false || op.synced === 0);
+    // Traemos todas las operaciones y filtramos manualmente para evitar el error de IDBKeyRange
+    const allOps = await db.getAll("pending_operations");
+
+    // Retornamos solo las que no han sido sincronizadas
+    return allOps.filter(
+      (op) => op.synced === false || op.synced === 0 || !op.synced,
+    );
   }
 
   async markOperationAsSynced(id: number): Promise<void> {

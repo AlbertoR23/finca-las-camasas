@@ -95,7 +95,7 @@ export class SupabaseAnimalRepository implements IAnimalRepository {
    * y lo encola para sincronización posterior.
    */
   // ✅ CORREGIDO: Tipo definido en lugar de any
-  async crear(animalData: {
+  async create(animalData: {
     nombre: string;
     numeroArete: string;
     sexo: "Macho" | "Hembra";
@@ -119,6 +119,7 @@ export class SupabaseAnimalRepository implements IAnimalRepository {
       padre_id: animalData.padreId || null,
       madre_id: animalData.madreId || null,
       pending: true, // ✅ Bandera crucial para la UI
+      synced: false
     };
 
     try {

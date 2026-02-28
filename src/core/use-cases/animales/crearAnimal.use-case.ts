@@ -30,7 +30,7 @@ export class CrearAnimalUseCase {
     const animal = new Animal(request);
 
     // Guardar en el repositorio
-    const animalGuardado = await this.animalRepository.crear(animal);
+    const animalGuardado = await this.animalRepository.create(animal);
 
     // Calcular fecha de destete (lógica de negocio pura)
     const fechaDestete = animalGuardado.calcularFechaDestete();

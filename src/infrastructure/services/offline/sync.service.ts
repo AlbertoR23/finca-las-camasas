@@ -1,4 +1,3 @@
-// src/infrastructure/services/offline/sync.service.ts
 import {
   OfflineStorageService,
   PendingOperation,
@@ -25,94 +24,90 @@ export class SyncService {
   private setupNetworkListeners(): void {
     if (typeof window !== "undefined") {
       window.addEventListener("online", () => {
-        console.log("🌐 Red detectada, validando conexión real...");
-        // Intentar sincronizar solo si realmente hay internet
+        console.log("🌐 Red detectada, sincronizando...");
         this.sync();
       });
     }
   }
 
   async sync(): Promise<void> {
-    // Evitar múltiples sincronizaciones simultáneas o si no hay red real
     if (this.isSyncing || typeof window === "undefined" || !navigator.onLine) {
       return;
     }
 
     this.isSyncing = true;
-    console.log("🔄 Iniciando proceso de sincronización masiva...");
+    console.log("🔄 Iniciando sincronización...");
 
     try {
-      // 1. Validar conexión real con un "ping" a Supabase antes de empezar
+      // Verificar conexión real
       const { error: pingError } = await this.supabase
         .from("animales")
         .select("id")
         .limit(1);
-      if (pingError) throw new Error("No hay conexión real con Supabase");
+      if (pingError) throw new Error("Sin conexión a Supabase");
 
       const pendingOps = await this.offlineStorage.getPendingOperations();
-      console.log(
-        `📋 Operaciones pendientes encontradas: ${pendingOps.length}`,
-      );
+      console.log(`📋 Operaciones pendientes: ${pendingOps.length}`);
 
-      // 2. Procesar en orden secuencial (importante para mantener coherencia)
       for (const op of pendingOps) {
         try {
           await this.processOperation(op);
-          await this.offlineStorage.markOperationAsSynced(op.id!);
+          if (op.id) {
+            await this.offlineStorage.markOperationAsSynced(op.id);
+          }
           console.log(`✅ Operación ${op.id} (${op.operation}) sincronizada`);
         } catch (error) {
-          // Si una falla, registramos el error pero seguimos con la siguiente
-          console.error(
-            `❌ Falló la operación ${op.id} en la tabla ${op.table}:`,
-            error,
-          );
+          console.error(`❌ Error en operación ${op.id}:`, error);
         }
       }
 
-      // 3. Limpiar la cola y refrescar la memoria local con datos del servidor
-      await this.offlineStorage.clearSyncedOperations();
-      await this.refreshCache();
-
-      console.log(
-        "✅ Sincronización de Finca las Camasas completada con éxito",
-      );
-    } catch (error) {
-      console.error("❌ Abortando sincronización por fallo de red:", error);
-    } finally {
-      this.isSyncing = false;
-    }
-  }
-
-  public async sync() {
-    if (this.isSyncing) return;
-    this.isSyncing = true;
-
-    try {
-      const pending = await this.offlineStorage.getPendingOperations();
-      if (pending.length === 0) return;
-
-      for (const op of pending) {
-        await this.processOperation(op);
-      }
-
-      // ✅ TIEMPO DE ESPERA: 2 segundos para asegurar que Supabase indexó los datos
+      // Esperar para que Supabase indexe
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
       await this.offlineStorage.clearSyncedOperations();
       await this.refreshCache();
 
-      // ✅ Avisamos a los hooks que la sincronización terminó
       window.dispatchEvent(new CustomEvent("sync-complete"));
-    } catch (err) {
-      console.error("Sync failed:", err);
+      console.log("✅ Sincronización completada");
+    } catch (error) {
+      console.error("❌ Error en sincronización:", error);
     } finally {
       this.isSyncing = false;
     }
   }
 
+  private async processOperation(op: PendingOperation): Promise<void> {
+    const { table, operation, data } = op;
+
+    // Eliminar campos internos antes de enviar a Supabase
+    const { pending, synced, ...cleanData } = data;
+
+    switch (operation) {
+      case "INSERT":
+        await this.supabase.from(table).insert([cleanData]);
+        break;
+
+      case "UPDATE":
+        if (!cleanData.id) throw new Error("ID requerido para UPDATE");
+        await this.supabase
+          .from(table)
+          .update(cleanData)
+          .eq("id", cleanData.id);
+        break;
+
+      case "DELETE":
+        if (!cleanData.id) throw new Error("ID requerido para DELETE");
+        await this.supabase.from(table).delete().eq("id", cleanData.id);
+        break;
+
+      default:
+        throw new Error(`Operación desconocida: ${operation}`);
+    }
+  }
+
   private async refreshCache(): Promise<void> {
     const tables = ["animales", "contabilidad", "registros_diarios", "vacunas"];
-    console.log("📥 Refrescando caché local con datos frescos...");
+    console.log("📥 Refrescando caché local...");
 
     for (const table of tables) {
       try {
@@ -121,7 +116,7 @@ export class SyncService {
           await this.offlineStorage.cacheData(table, data);
         }
       } catch (e) {
-        console.warn(`No se pudo refrescar la tabla ${table}`);
+        console.warn(`No se pudo refrescar ${table}`);
       }
     }
   }

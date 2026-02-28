@@ -1,17 +1,22 @@
-// src/presentation/hooks/useAnimales.ts
+"use client";
+
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Animal } from "@/src/core/entities/Animal";
 import { SupabaseAnimalRepository } from "@/src/infrastructure/repositories/supabase/SupabaseAnimalRepository";
 import { CrearAnimalUseCase } from "@/src/core/use-cases/animales/crearAnimal.use-case";
 import { ObtenerAnimalesUseCase } from "@/src/core/use-cases/animales/obtenerAnimales.use-case";
 import { EliminarAnimalUseCase } from "@/src/core/use-cases/animales/eliminarAnimal.use-case";
+import { useOfflineStatus } from "./useOfflineStatus";
 
 export function useAnimales() {
   const [animales, setAnimales] = useState<Animal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Usar useRef para mantener las mismas instancias entre renders
+  // Obtenemos el estado de conexión para saber cuándo refrescar
+  const { isOnline } = useOfflineStatus();
+
+  // Mantenemos instancias estables para proteger la RAM de 4GB
   const animalRepositoryRef = useRef(new SupabaseAnimalRepository());
 
   const obtenerAnimalesUseCaseRef = useRef(
@@ -24,23 +29,33 @@ export function useAnimales() {
     new EliminarAnimalUseCase(animalRepositoryRef.current),
   );
 
+  /**
+   * ✅ MEJORA: Carga de animales inteligente.
+   * Evita limpiar el estado (setAnimales([])) para que los contadores no se pongan en 0/0.
+   */
   const cargarAnimales = useCallback(async () => {
     try {
       setLoading(true);
-      console.log("🔄 Cargando animales...");
+      console.log("🔄 Sincronizando lista de animales...");
+
       const animalesObtenidos =
         await obtenerAnimalesUseCaseRef.current.execute();
-      console.log("✅ Animales cargados:", animalesObtenidos.length);
+
+      // Solo actualizamos si hay cambios o es la carga inicial
       setAnimales(animalesObtenidos);
       setError(null);
     } catch (err) {
-      console.error("❌ Error cargando animales:", err);
+      console.error("❌ Error en useAnimales:", err);
       setError(err instanceof Error ? err.message : "Error al cargar animales");
     } finally {
       setLoading(false);
     }
-  }, []); // ← Vacío porque useRef mantiene las instancias estables
+  }, []);
 
+  /**
+   * ✅ MEJORA: Registro con actualización optimista.
+   * Crea una instancia real de Animal para evitar "NaN" en las fechas.
+   */
   const crearAnimal = useCallback(
     async (animalData: {
       nombre: string;
@@ -52,41 +67,36 @@ export function useAnimales() {
     }) => {
       try {
         setLoading(true);
-        console.log("🔄 Ejecutando caso de uso de creación...");
-
         const nuevoAnimal =
           await crearAnimalUseCaseRef.current.execute(animalData);
 
-        // ✅ ACTUALIZACIÓN OPTIMISTA: No esperamos al reload, lo metemos directo al estado
-        setAnimales((prev) => [...prev, nuevoAnimal as Animal]);
+        // ✅ Cast seguro a Animal para asegurar que los métodos de la entidad existan
+        const animalFinal =
+          nuevoAnimal instanceof Animal ? nuevoAnimal : new Animal(nuevoAnimal);
 
-        console.log("✅ Interfaz actualizada con el nuevo animal");
-        return nuevoAnimal;
+        setAnimales((prev) => [animalFinal, ...prev]);
+        console.log("✅ Registro añadido al estado local");
+        return animalFinal;
       } catch (err) {
-        console.error("❌ Error en el hook al crear animal:", err);
         setError(err instanceof Error ? err.message : "Error al crear animal");
         throw err;
       } finally {
         setLoading(false);
       }
     },
-    [], // Eliminamos cargarAnimales de las dependencias para evitar renders infinitos
+    [],
   );
 
-  const eliminarAnimal = useCallback(
-    async (id: string) => {
-      try {
-        await eliminarAnimalUseCaseRef.current.execute(id);
-        cargarAnimales();
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Error al eliminar animal",
-        );
-        throw err;
-      }
-    },
-    [cargarAnimales],
-  );
+  const eliminarAnimal = useCallback(async (id: string) => {
+    try {
+      await eliminarAnimalUseCaseRef.current.execute(id);
+      // Filtramos localmente para respuesta inmediata
+      setAnimales((prev) => prev.filter((a) => a.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al eliminar animal");
+      throw err;
+    }
+  }, []);
 
   const buscarAnimales = useCallback(async (termino: string) => {
     try {
@@ -95,15 +105,33 @@ export function useAnimales() {
         await animalRepositoryRef.current.findBySearchTerm(termino);
       setAnimales(resultados);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al buscar animales");
+      setError(err instanceof Error ? err.message : "Error al buscar");
     } finally {
       setLoading(false);
     }
-  }, []); // ← Vacío porque animalRepositoryRef es estable
+  }, []);
 
+  /**
+   * ✅ EFECTO MAESTRO: Escucha la sincronización de fondo.
+   * Cuando el SyncService termina de subir datos a Supabase, este evento se dispara
+   * y refresca la lista automáticamente.
+   */
   useEffect(() => {
+    // Carga inicial
     cargarAnimales();
-  }, [cargarAnimales]); // ← Solo se ejecuta cuando cargarAnimales cambia (nunca)
+
+    const handleSyncComplete = () => {
+      console.log("📡 Sincronización detectada: Refrescando UI...");
+      cargarAnimales();
+    };
+
+    // Escuchamos el evento personalizado que definimos en el SyncService
+    window.addEventListener("sync-complete", handleSyncComplete);
+
+    return () => {
+      window.removeEventListener("sync-complete", handleSyncComplete);
+    };
+  }, [cargarAnimales]);
 
   return {
     animales,

@@ -73,45 +73,51 @@ export class SupabaseAnimalRepository implements IAnimalRepository {
    * Crea un animal. Si falla la red, lo guarda localmente
    * y lo encola para sincronización posterior.
    */
-  async create(animal: Animal): Promise<Animal> {
-    const animalData = animal.toJSON();
+  async crear(animalData: any): Promise<Animal> {
+    // Generamos un ID temporal para que React pueda manejar el registro offline
+    const idTemporal = crypto.randomUUID();
+
+    // Preparamos el objeto EXACTAMENTE como lo espera Supabase y tu UI
+    const nuevoRegistro = {
+      id: idTemporal,
+      nombre: animalData.nombre,
+      numero_arete: animalData.numero_arete,
+      sexo: animalData.sexo,
+      fecha_nacimiento: animalData.fecha_nacimiento || new Date().toISOString(),
+      padre_id: animalData.padre_id || null,
+      madre_id: animalData.madre_id || null,
+      pending: true, // ✅ Bandera crucial para la UI
+    };
 
     try {
-      // Intentar operación online directamente
-      const { data, error } = await this.supabase
-        .from("animales")
-        .insert([animalData])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Actualización incremental del caché (sin descargar todo de nuevo)
-      const cached = await this.offlineStorage.getCachedData("animales");
-      cached.push(data);
-      await this.offlineStorage.cacheData("animales", cached);
-
-      return Animal.fromSupabase(data);
+      if (navigator.onLine) {
+        const { data, error } = await supabase
+          .from("animales")
+          .insert([nuevoRegistro])
+          .select()
+          .single();
+        if (error) throw error;
+        return Animal.fromSupabase(data);
+      }
+      throw new Error("Offline");
     } catch (error) {
-      console.error("🌐 Error de red, guardando animal offline...");
+      console.warn("🌐 Guardando en cola offline...");
 
-      // Generar un ID temporal si no tiene uno para IndexedDB
-      const offlineId = animalData.id || crypto.randomUUID();
-      const localData = { ...animalData, id: offlineId, pending: true };
-
-      // 1. Encolar operación para SyncService
+      // 1. Guardar en la cola de sincronización
       await this.offlineStorage.queueOperation({
         table: "animales",
         operation: "INSERT",
-        data: localData,
+        data: nuevoRegistro,
       });
 
-      // 2. Guardar en caché local para que aparezca en la lista
+      // 2. Actualizar caché local para que aparezca EN EL MOMENTO en la lista
       const cached = await this.offlineStorage.getCachedData("animales");
-      cached.push(localData);
-      await this.offlineStorage.cacheData("animales", cached);
+      await this.offlineStorage.cacheData("animales", [
+        nuevoRegistro,
+        ...cached,
+      ]);
 
-      return Animal.fromSupabase(localData);
+      return Animal.fromSupabase(nuevoRegistro);
     }
   }
 

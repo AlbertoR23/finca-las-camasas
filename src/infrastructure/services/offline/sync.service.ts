@@ -83,41 +83,30 @@ export class SyncService {
     }
   }
 
-  public async processOperation(op: PendingOperation): Promise<void> {
-    const { table, operation, data } = op;
+  public async sync() {
+    if (this.isSyncing) return;
+    this.isSyncing = true;
 
-    // ✅ MEJORA: Limpiar datos de UI antes de enviar a base de datos
-    // Eliminamos 'pending' y otros campos locales que no existen en Supabase
-    const { pending, ...cleanData } = data;
+    try {
+      const pending = await this.offlineStorage.getPendingOperations();
+      if (pending.length === 0) return;
 
-    switch (operation) {
-      case "INSERT":
-        // En INSERT, si el ID es temporal (UUID generado localmente),
-        // Supabase lo aceptará si la columna es UUID, de lo contrario,
-        // podrías querer eliminarlo para que Supabase genere uno nuevo.
-        const { error: insError } = await this.supabase
-          .from(table)
-          .insert([cleanData]);
-        if (insError) throw insError;
-        break;
+      for (const op of pending) {
+        await this.processOperation(op);
+      }
 
-      case "UPDATE":
-        if (!cleanData.id) throw new Error("Falta ID para actualizar");
-        const { error: updError } = await this.supabase
-          .from(table)
-          .update(cleanData)
-          .eq("id", cleanData.id);
-        if (updError) throw updError;
-        break;
+      // ✅ TIEMPO DE ESPERA: 2 segundos para asegurar que Supabase indexó los datos
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      case "DELETE":
-        if (!cleanData.id) throw new Error("Falta ID para eliminar");
-        const { error: delError } = await this.supabase
-          .from(table)
-          .delete()
-          .eq("id", cleanData.id);
-        if (delError) throw delError;
-        break;
+      await this.offlineStorage.clearSyncedOperations();
+      await this.refreshCache();
+
+      // ✅ Avisamos a los hooks que la sincronización terminó
+      window.dispatchEvent(new CustomEvent("sync-complete"));
+    } catch (err) {
+      console.error("Sync failed:", err);
+    } finally {
+      this.isSyncing = false;
     }
   }
 

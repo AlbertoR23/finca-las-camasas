@@ -73,71 +73,75 @@ export default function DashboardPage() {
        * ════════════════════════════════════════════════════════
        */}
       <header
-              className="sticky top-0 z-20 text-white px-6 py-4 shadow-[0_8px_32px_rgba(27,67,50,0.35)]"
-              style={{
-                background:
-                  "linear-gradient(135deg, #1B4332 0%, #2D6A4F 60%, #40916C 100%)",
-                borderRadius: "0 0 2rem 2rem",
-              }}
+        className="sticky top-0 z-20 text-white px-5 py-3.5 shadow-[0_8px_32px_rgba(27,67,50,0.35)]"
+        style={{
+          background: "linear-gradient(135deg, #1B4332 0%, #2D6A4F 60%, #40916C 100%)",
+          borderRadius: "0 0 2rem 2rem",
+        }}
+      >
+        {/* Textura sutil de fondo */}
+        <div
+          className="absolute inset-0 opacity-10 pointer-events-none"
+          style={{
+            backgroundImage:
+              "repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(255,255,255,0.15) 8px, rgba(255,255,255,0.15) 9px)",
+            borderRadius: "0 0 2rem 2rem",
+          }}
+        />
+
+        <div className="max-w-md mx-auto relative">
+
+          {/* ── Fila superior: Bienvenida + SyncIndicator alineados opuestos ── */}
+          <div className="flex items-center justify-between mb-1 gap-2">
+            <p className="text-green-200 text-[9px] font-semibold uppercase tracking-[0.2em] opacity-90 truncate min-w-0">
+              Bienvenido, Leonardo Marcano
+            </p>
+            {/* SyncIndicator en su propio espacio, nunca aplasta el texto */}
+            <div className="shrink-0">
+              <SyncIndicator />
+            </div>
+          </div>
+
+          {/* ── Fila inferior: Nombre finca (izquierda) + BCV + Toggle (derecha) ── */}
+          <div className="flex items-center justify-between gap-3">
+
+            {/* Identidad */}
+            <h1
+              className="text-xl sm:text-2xl font-black tracking-tight leading-none truncate min-w-0"
+              style={{ textShadow: "0 2px 8px rgba(0,0,0,0.25)" }}
             >
-              {/* Textura sutil de fondo */}
-              <div
-                className="absolute inset-0 opacity-10 pointer-events-none"
-                style={{
-                  backgroundImage:
-                    "repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(255,255,255,0.15) 8px, rgba(255,255,255,0.15) 9px)",
-                  borderRadius: "0 0 2rem 2rem",
-                }}
-              />
+              Finca las Camasas
+            </h1>
 
-              <div className="max-w-md mx-auto flex justify-between items-center relative">
-                {/* ── Identidad de la finca ── */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="text-green-200 text-[9px] font-semibold uppercase tracking-[0.25em] opacity-90 truncate">
-                      Bienvenido, Leonardo Marcano
-                    </p>
-                    {/* ✅ Nube de sincronización */}
-                    <div className="shrink-0">
-                      <SyncIndicator />
-                    </div>
-                  </div>
-
-                  <h1
-                    className="text-2xl sm:text-3xl font-black tracking-tight leading-none truncate"
-                    style={{ textShadow: "0 2px 8px rgba(0,0,0,0.25)" }}
+            {/* Card BCV + ThemeToggle */}
+            <div className="flex items-center gap-2 shrink-0">
+              <ThemeToggle />
+              <div className="bg-black/20 backdrop-blur-sm px-3 py-1.5 rounded-xl border border-white/20 text-center flex flex-col items-center gap-0.5">
+                <span className="flex items-center gap-1">
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      tasa.origen === "api"
+                        ? "bg-green-400 animate-pulse"
+                        : "bg-orange-400"
+                    }`}
+                  />
+                  <p
+                    className={`text-[7px] font-black uppercase tracking-widest ${
+                      tasa.origen === "api" ? "text-green-300" : "text-orange-300"
+                    }`}
                   >
-                    Finca las Camasas
-                  </h1>
-                </div>
-
-                {/* ── Card tasa BCV y toggle de tema ── */}
-                <div className="flex items-center gap-2 shrink-0">
-                  <ThemeToggle />
-                  <div className="bg-black/20 backdrop-blur-sm px-3 py-2 rounded-xl border border-white/20 text-center flex flex-col items-center gap-0.5">
-                    <span className="flex items-center gap-1">
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          tasa.origen === "api"
-                            ? "bg-green-400 animate-pulse"
-                            : "bg-orange-400"
-                        }`}
-                      />
-                      <p
-                        className={`text-[7px] font-black uppercase tracking-widest ${
-                          tasa.origen === "api" ? "text-green-300" : "text-orange-300"
-                        }`}
-                      >
-                        {tasa.origen === "api" ? "BCV Live" : "Offline"}
-                      </p>
-                    </span>
-                    <p className="text-sm font-bold leading-none text-white">
-                      Bs {tasa.value.toFixed(2)}
-                    </p>
-                  </div>
-                </div>
+                    {tasa.origen === "api" ? "BCV Live" : "Offline"}
+                  </p>
+                </span>
+                <p className="text-sm font-bold leading-none text-white">
+                  Bs {tasa.value.toFixed(2)}
+                </p>
               </div>
-            </header>
+            </div>
+
+          </div>
+        </div>
+      </header>
 
       {/* ... resto del código sin cambios ... */}
       <div className="max-w-md mx-auto px-4 pt-12 -mt-8 space-y-4 relative z-10">

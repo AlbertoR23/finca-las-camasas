@@ -1,4 +1,4 @@
-// src/presentation/hooks/useAnimales.ts
+"use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Animal } from "@/src/core/entities/Animal";
 import { SupabaseAnimalRepository } from "@/src/infrastructure/repositories/supabase/SupabaseAnimalRepository";
@@ -11,97 +11,93 @@ export function useAnimales() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Usar useRef para mantener las mismas instancias entre renders
-  const animalRepositoryRef = useRef(new SupabaseAnimalRepository());
-
-  const obtenerAnimalesUseCaseRef = useRef(
-    new ObtenerAnimalesUseCase(animalRepositoryRef.current),
-  );
-  const crearAnimalUseCaseRef = useRef(
-    new CrearAnimalUseCase(animalRepositoryRef.current),
-  );
-  const eliminarAnimalUseCaseRef = useRef(
-    new EliminarAnimalUseCase(animalRepositoryRef.current),
-  );
+  // Instancias estables para evitar recreaciones
+  const animalRepo = useRef(new SupabaseAnimalRepository());
 
   const cargarAnimales = useCallback(async () => {
     try {
       setLoading(true);
-      console.log("🔄 Cargando animales...");
-      const animalesObtenidos =
-        await obtenerAnimalesUseCaseRef.current.execute();
-      console.log("✅ Animales cargados:", animalesObtenidos.length);
-      setAnimales(animalesObtenidos);
       setError(null);
+      const useCase = new ObtenerAnimalesUseCase(animalRepo.current);
+      const data = await useCase.execute();
+      setAnimales(data);
     } catch (err) {
       console.error("❌ Error cargando animales:", err);
-      setError(err instanceof Error ? err.message : "Error al cargar animales");
+      setError(err instanceof Error ? err.message : "Error al cargar");
     } finally {
       setLoading(false);
     }
-  }, []); // ← Vacío porque useRef mantiene las instancias estables
+  }, []);
 
-  const crearAnimal = useCallback(
-    async (animalData: {
-      nombre: string;
-      numeroArete: string;
-      fechaNacimiento: Date;
-      sexo: "Macho" | "Hembra";
-      padreId?: string | null;
-      madreId?: string | null;
-    }) => {
-      try {
-        console.log("🔄 Creando animal...", animalData);
-        const resultado =
-          await crearAnimalUseCaseRef.current.execute(animalData);
-        console.log("✅ Animal creado:", resultado);
+  const crearAnimal = useCallback(async (data: any) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const useCase = new CrearAnimalUseCase(animalRepo.current);
+      const response = await useCase.execute(data);
 
-        // Pequeño delay para asegurar que Supabase procesó
-        setTimeout(() => {
-          cargarAnimales();
-        }, 100);
+      // Actualización optimista
+      setAnimales((prev) => {
+        // Evitar duplicados si el animal ya existe
+        const existe = prev.some((a) => a.id === response.animal.id);
+        if (existe) return prev;
+        return [response.animal, ...prev];
+      });
 
-        return resultado;
-      } catch (err) {
-        console.error("❌ Error creando animal:", err);
-        setError(err instanceof Error ? err.message : "Error al crear animal");
-        throw err;
-      }
-    },
-    [cargarAnimales], // ← Solo depende de cargarAnimales
-  );
+      return response.animal;
+    } catch (err) {
+      console.error("❌ Error creando animal:", err);
+      setError(err instanceof Error ? err.message : "Error al crear");
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const eliminarAnimal = useCallback(
-    async (id: string) => {
-      try {
-        await eliminarAnimalUseCaseRef.current.execute(id);
-        cargarAnimales();
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Error al eliminar animal",
-        );
-        throw err;
-      }
-    },
-    [cargarAnimales],
-  );
+  const eliminarAnimal = useCallback(async (id: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const useCase = new EliminarAnimalUseCase(animalRepo.current);
+      await useCase.execute(id);
+
+      // Actualización optimista
+      setAnimales((prev) => prev.filter((a) => a.id !== id));
+    } catch (err) {
+      console.error("❌ Error eliminando animal:", err);
+      setError(err instanceof Error ? err.message : "Error al eliminar");
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   const buscarAnimales = useCallback(async (termino: string) => {
     try {
       setLoading(true);
-      const resultados =
-        await animalRepositoryRef.current.findBySearchTerm(termino);
+      setError(null);
+      const resultados = await animalRepo.current.findBySearchTerm(termino);
       setAnimales(resultados);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al buscar animales");
+      console.error("❌ Error buscando:", err);
+      setError(err instanceof Error ? err.message : "Error al buscar");
     } finally {
       setLoading(false);
     }
-  }, []); // ← Vacío porque animalRepositoryRef es estable
+  }, []);
 
   useEffect(() => {
     cargarAnimales();
-  }, [cargarAnimales]); // ← Solo se ejecuta cuando cargarAnimales cambia (nunca)
+
+    const handleSyncComplete = () => {
+      console.log("📡 Sincronización detectada, recargando...");
+      cargarAnimales();
+    };
+
+    window.addEventListener("sync-complete", handleSyncComplete);
+    return () =>
+      window.removeEventListener("sync-complete", handleSyncComplete);
+  }, [cargarAnimales]);
 
   return {
     animales,

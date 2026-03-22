@@ -27,6 +27,7 @@ export function AnimalForm({ animales, onSubmit, onCancel }: AnimalFormProps) {
     madre_id: "",
   });
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // ── Validación en tiempo real ──────────────────────────────────────────────
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -48,6 +49,17 @@ export function AnimalForm({ animales, onSubmit, onCancel }: AnimalFormProps) {
     return !isNaN(d.getTime()) && d <= new Date();
   };
 
+  /** ✅ NUEVO: Validación de caracteres especiales (opcional, previene problemas) */
+  const validarCaracteres = (texto: string, campo: string): boolean => {
+    // Permitir letras, números, espacios, guiones, acentos y ñ
+    const regex = /^[a-zA-ZáéíóúñÑüÜ\s0-9-]+$/;
+    if (!regex.test(texto)) {
+      setSubmitError(`El ${campo} solo puede contener letras, números, espacios y guiones`);
+      return false;
+    }
+    return true;
+  };
+
   const errors = {
     nombre:
       touched.nombre && !formData.nombre.trim() ? "El nombre es requerido" : "",
@@ -66,12 +78,23 @@ export function AnimalForm({ animales, onSubmit, onCancel }: AnimalFormProps) {
     return true;
   };
 
-  // ── Submit ─────────────────────────────────────────────────────────────────
+  // ── Submit con protección anti-múltiples clics ─────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // 🚫 PREVENIR MÚLTIPLES ENVÍOS MIENTRAS YA HAY UNO EN PROCESO
+    if (submitting) {
+      console.log("⏳ Ya hay un envío en progreso, espera...");
+      return;
+    }
+
     // Marcar todos como tocados para mostrar errores
     setTouched({ nombre: true, arete: true, nacimiento: true });
+    setSubmitError(null);
+
+    // Validar caracteres especiales (opcional pero recomendado)
+    if (!validarCaracteres(formData.nombre, "nombre")) return;
+    if (!validarCaracteres(formData.arete, "arete")) return;
 
     if (
       !formData.nombre.trim() ||
@@ -82,6 +105,7 @@ export function AnimalForm({ animales, onSubmit, onCancel }: AnimalFormProps) {
     }
 
     setSubmitting(true);
+
     try {
       await onSubmit({
         nombre: formData.nombre,
@@ -107,8 +131,15 @@ export function AnimalForm({ animales, onSubmit, onCancel }: AnimalFormProps) {
       setTouched({});
       setPadreSearch("");
       setMadreSearch("");
+      setSubmitError(null);
+    } catch (error) {
+      console.error("❌ Error guardando animal:", error);
+      setSubmitError("Error al guardar. Intenta de nuevo.");
     } finally {
-      setSubmitting(false);
+      // ✅ Esperar 1 segundo antes de habilitar el botón de nuevo
+      setTimeout(() => {
+        setSubmitting(false);
+      }, 1000);
     }
   };
 
@@ -190,6 +221,13 @@ export function AnimalForm({ animales, onSubmit, onCancel }: AnimalFormProps) {
         </div>
       )}
 
+      {/* ── Mensaje de error global ── */}
+      {submitError && (
+        <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-600 text-sm font-medium text-center">
+          ⚠️ {submitError}
+        </div>
+      )}
+
       <form
         onSubmit={handleSubmit}
         className="space-y-4 p-5 bg-slate-50 rounded-3xl shadow-lg"
@@ -201,7 +239,7 @@ export function AnimalForm({ animales, onSubmit, onCancel }: AnimalFormProps) {
             📝
           </span>
           <input
-            placeholder="Nombre del Búfalo"
+            placeholder="Nombre del Búfalo (solo letras, números, guiones)"
             className={fieldClass("nombre", formData.nombre) + " pl-11 pr-10"}
             style={{ minHeight: 56 }}
             value={formData.nombre}
@@ -225,7 +263,7 @@ export function AnimalForm({ animales, onSubmit, onCancel }: AnimalFormProps) {
           {/* Arete */}
           <div className="relative">
             <label className="block text-xs font-bold text-slate-500 mb-1 ml-1">
-              🔖 Arete / ID
+              🔖 Arete / ID (solo letras, números, guiones)
             </label>
             <div className="relative">
               <input
@@ -529,11 +567,11 @@ export function AnimalForm({ animales, onSubmit, onCancel }: AnimalFormProps) {
 
         {/* ── 5. Botones de acción ──────────────────────────────────────────── */}
         <div className="flex gap-3 pt-2">
-          {/* Botón principal: siempre visible, fondo verde oscuro */}
+          {/* Botón principal con protección visual */}
           <button
             type="submit"
             disabled={submitting}
-            className="flex-1 flex items-center justify-center gap-2 rounded-2xl text-white font-bold text-base transition-all duration-200 active:scale-95 disabled:opacity-70"
+            className={`flex-1 flex items-center justify-center gap-2 rounded-2xl text-white font-bold text-base transition-all duration-200 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed`}
             style={{
               minHeight: 56,
               background: submitting ? "#2d6a4f" : "#1B4332",
@@ -542,7 +580,6 @@ export function AnimalForm({ animales, onSubmit, onCancel }: AnimalFormProps) {
           >
             {submitting ? (
               <>
-                {/* Spinner CSS puro */}
                 <span className="animate-spin-custom inline-block w-5 h-5 rounded-full border-2 border-white/30 border-t-white" />
                 Guardando...
               </>

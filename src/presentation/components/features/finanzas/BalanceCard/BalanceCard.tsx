@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Card } from "../../../common/Card/Card";
-import { Button } from "../../../common/Button/Button";
 
 export interface BalanceCardProps {
   balance: {
@@ -50,17 +48,69 @@ export function BalanceCard({
     return monto;
   };
 
-  const formatoMonto = (monto: number) => {
+  // ✅ FUNCIÓN MEJORADA PARA FORMATEAR NÚMEROS GRANDES (Opción 5)
+  const formatoMontoProfesional = (monto: number): string => {
+    // Si es USD, mostrar con formato normal (los dólares no suelen ser tan grandes)
+    if (verEnDolares) {
+      return monto.toLocaleString("es-VE", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    }
+
+    // Para bolívares, abreviar si es necesario
+    const millones = 1_000_000;
+    const milesMillones = 1_000_000_000;
+    const billones = 1_000_000_000_000;
+
+    if (monto >= billones) {
+      return (monto / billones).toFixed(2) + "B";
+    }
+    if (monto >= milesMillones) {
+      return (monto / milesMillones).toFixed(2) + "MM";
+    }
+    if (monto >= millones) {
+      return (monto / millones).toFixed(2) + "M";
+    }
+    if (monto >= 1000) {
+      return (monto / 1000).toFixed(1) + "K";
+    }
+
     return monto.toLocaleString("es-VE", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
   };
 
+  // ✅ FUNCIÓN PARA DETERMINAR EL TAMAÑO DE FUENTE SEGÚN LA LONGITUD
+  const getFontSize = (monto: number, textoFormateado: string): string => {
+    // Si está en USD, usar tamaño normal
+    if (verEnDolares) return "text-7xl";
+
+    // Si tiene abreviatura (M, MM, B), mantener tamaño grande
+    if (textoFormateado.includes("M") || textoFormateado.includes("B")) {
+      return "text-7xl";
+    }
+
+    // Según la longitud del número formateado
+    if (textoFormateado.length > 15) return "text-4xl";
+    if (textoFormateado.length > 12) return "text-5xl";
+    if (textoFormateado.length > 9) return "text-6xl";
+    return "text-7xl";
+  };
+
   const simbolo = verEnDolares ? "$" : "Bs";
   const balanceMostrar = calcularMontoMostrar(balance.neto);
   const ingresosMostrar = calcularMontoMostrar(balance.ingresos);
   const gastosMostrar = calcularMontoMostrar(balance.gastos);
+
+  // Formatear los montos con la función profesional
+  const balanceFormateado = formatoMontoProfesional(balanceMostrar);
+  const ingresosFormateado = formatoMontoProfesional(ingresosMostrar);
+  const gastosFormateado = formatoMontoProfesional(gastosMostrar);
+
+  // Tamaño de fuente dinámico
+  const balanceFontSize = getFontSize(balanceMostrar, balanceFormateado);
 
   // ── Color dinámico del balance ────────────────────────────────────────────
   const colorBalance =
@@ -117,15 +167,12 @@ export function BalanceCard({
           style={{ height: 60 }}
         >
           <defs>
-            {/* Degradado verde para el área */}
             <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#10b981" stopOpacity="0.35" />
               <stop offset="100%" stopColor="#10b981" stopOpacity="0.01" />
             </linearGradient>
-            {/* Grid sutil */}
           </defs>
 
-          {/* Grid lines sutiles */}
           {[0.25, 0.5, 0.75].map((frac) => (
             <line
               key={frac}
@@ -139,20 +186,15 @@ export function BalanceCard({
             />
           ))}
 
-          {/* Área degradada */}
           <path d={areaPath} fill="url(#areaGradient)" />
-
-          {/* Línea principal más gruesa */}
           <path
             d={linePath}
             fill="none"
             stroke="#10b981"
-            strokeWidth="2.5" /* stroke-4 equivalente en SVG */
+            strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
-
-          {/* Punto final resaltado */}
           <circle
             cx={puntos[puntos.length - 1].x}
             cy={puntos[puntos.length - 1].y}
@@ -165,11 +207,6 @@ export function BalanceCard({
   };
 
   return (
-    /*
-     * ── TARJETA PRINCIPAL ─────────────────────────────────────────────────
-     * Glassmorphism: fondo blanco semi-transparente + backdrop-blur + borde
-     * sutil + sombra pronunciada (shadow-2xl).
-     */
     <div
       className={`
         relative rounded-3xl
@@ -180,7 +217,6 @@ export function BalanceCard({
         ${className}
       `}
       style={{
-        /* Asegura que el backdrop-blur funcione en todos los navegadores */
         WebkitBackdropFilter: "blur(16px)",
         backdropFilter: "blur(16px)",
       }}
@@ -191,17 +227,11 @@ export function BalanceCard({
           Balance Neto
         </p>
 
-        {/*
-         * ── TOGGLE MONEDA (diseño switch) ────────────────────────────────
-         * BS izquierda / USD derecha con píldora deslizante animada.
-         * Verde cuando activo, gris cuando inactivo.
-         */}
         <button
           onClick={onToggleMoneda}
           className="relative flex items-center gap-0 bg-slate-100 rounded-full p-[3px] border border-slate-200 hover:border-emerald-300 transition-colors duration-200"
           aria-label="Cambiar moneda"
         >
-          {/* Píldora deslizante animada */}
           <span
             className={`
               absolute top-[3px] h-[calc(100%-6px)] w-[calc(50%-3px)]
@@ -234,11 +264,7 @@ export function BalanceCard({
         </button>
       </div>
 
-      {/*
-       * ── NÚMERO PRINCIPAL (XXL) ───────────────────────────────────────────
-       * text-7xl + font-black + color dinámico + glow + animación cross-fade
-       * 300ms ease-in-out al cambiar moneda.
-       */}
+      {/* ── NÚMERO PRINCIPAL CON TAMAÑO DINÁMICO ── */}
       <div
         className={`
           transition-all duration-300 ease-in-out
@@ -248,22 +274,20 @@ export function BalanceCard({
       >
         <h3
           className={`
-            text-7xl font-black tracking-tight leading-none mb-1
+            ${balanceFontSize} font-black tracking-tight leading-none mb-1
             ${colorBalance}
+            break-words
           `}
           style={{ fontVariantNumeric: "tabular-nums" }}
         >
-          {simbolo}&thinsp;{formatoMonto(balanceMostrar)}
+          {simbolo}&thinsp;{balanceFormateado}
         </h3>
         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
           {balance.neto >= 0 ? "Superávit del período" : "Déficit del período"}
         </p>
       </div>
 
-      {/*
-       * ── TARJETAS SECUNDARIAS: Ingresos / Gastos ──────────────────────────
-       * Fondo verde/rojo claro + iconos + hover scale 1.02 + números grandes
-       */}
+      {/* ── TARJETAS SECUNDARIAS: Ingresos / Gastos ── */}
       <div
         className={`
           grid grid-cols-2 gap-3 mt-5
@@ -291,7 +315,7 @@ export function BalanceCard({
             className="text-xl font-black text-emerald-700 leading-tight"
             style={{ fontVariantNumeric: "tabular-nums" }}
           >
-            {simbolo} {formatoMonto(ingresosMostrar)}
+            {simbolo} {ingresosFormateado}
           </p>
         </div>
 
@@ -315,7 +339,7 @@ export function BalanceCard({
             className="text-xl font-black text-rose-700 leading-tight"
             style={{ fontVariantNumeric: "tabular-nums" }}
           >
-            {simbolo} {formatoMonto(gastosMostrar)}
+            {simbolo} {gastosFormateado}
           </p>
         </div>
       </div>
@@ -323,10 +347,7 @@ export function BalanceCard({
       {/* ── GRÁFICO DE PRODUCCIÓN (si hay datos) ── */}
       <MiniChart />
 
-      {/*
-       * ── TASA BCV ─────────────────────────────────────────────────────────
-       * Texto pequeño pero legible + icono 💵 + indicador online/offline
-       */}
+      {/* ── TASA BCV ── */}
       <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <span className="text-sm leading-none">💵</span>

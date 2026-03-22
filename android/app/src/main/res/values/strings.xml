@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">finca-las-camasas</string>
+    <string name="title_activity_main">finca-las-camasas</string>
+    <string name="package_name">com.datave.fincacamasas</string>
+    <string name="custom_url_scheme">com.datave.fincacamasas</string>
+</resources>

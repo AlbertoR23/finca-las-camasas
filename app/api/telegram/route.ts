@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { TelegramService } from "@/src/infrastructure/services/telegram/telegram.service";
+export const dynamic = "force-static";
 
 export async function POST(request: Request) {
   try {

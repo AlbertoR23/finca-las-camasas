@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // ✅ Obligatorio para Capacitor - genera carpeta 'out'
+  // ✅ Obligatorio para Capacitor / PWA - genera carpeta 'out'
   output: "export",
 
   // ✅ Imágenes locales como estáticas (no optimizadas por Next)
@@ -8,11 +8,8 @@ const nextConfig = {
     unoptimized: true,
   },
 
-  // ✅ Trailing slash para rutas relativas en APK
+  // ✅ Trailing slash para rutas relativas en APK y PWA
   trailingSlash: true,
-
-  // ✅ Mejor rendimiento en producción
-  swcMinify: true,
 
   // ✅ Eliminar console.log en producción (opcional)
   compiler: {
@@ -28,6 +25,8 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+
+  // ❌ ELIMINADO: swcMinify (obsoleto en Next.js 16, ahora es el predeterminado)
 };
 
 module.exports = nextConfig;

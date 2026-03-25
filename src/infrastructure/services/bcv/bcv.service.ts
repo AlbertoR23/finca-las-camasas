@@ -3,12 +3,11 @@ export interface TasaBCV {
   value: number;
   fecha: Date;
   origen: "api" | "local" | "default";
-  timestamp?: string; // Para guardar la fecha real de la API
+  timestamp?: string;
 }
 
 export class BCVService {
   private static instance: BCVService;
-  private readonly API_URL = "https://ve.dolarapi.com/v1/dolares/oficial";
   private readonly STORAGE_KEY = "tasaGuardada";
   private readonly TASA_DEFAULT = 396.37;
   private readonly MAX_REINTENTOS = 3;
@@ -24,30 +23,39 @@ export class BCVService {
     return BCVService.instance;
   }
 
+  /**
+   * ✅ AHORA llama a /api/bcv (tu propio endpoint)
+   * El SW no interceptará esta petición porque está en NO_CACHE_PATTERNS
+   */
   async obtenerTasa(forzar: boolean = false): Promise<TasaBCV> {
-    // Si no forzamos y tenemos una actualización reciente (< 5 min), usar esa
+    // Cache de 5 minutos para evitar llamadas excesivas
     if (!forzar && this.ultimaActualizacionExitosa) {
-      const minutosDesde = (Date.now() - this.ultimaActualizacionExitosa.getTime()) / (1000 * 60);
+      const minutosDesde =
+        (Date.now() - this.ultimaActualizacionExitosa.getTime()) / (1000 * 60);
       if (minutosDesde < 5) {
         const tasaLocal = this.obtenerTasaRespaldo();
-        if (tasaLocal.origen !== 'default') {
-          console.log(`⏱️ Usando tasa reciente (hace ${minutosDesde.toFixed(0)} min)`);
+        if (tasaLocal.origen !== "default") {
+          console.log(
+            `⏱️ Usando tasa local (hace ${minutosDesde.toFixed(0)} min)`,
+          );
           return tasaLocal;
         }
       }
     }
 
     try {
-      console.log(`🌐 Solicitando tasa BCV...`);
+      console.log(`🌐 Solicitando tasa BCV directamente...`);
 
-      const response = await fetch(this.API_URL, {
-        cache: "no-store",
-        headers: { Accept: "application/json" },
-      });
+      // ✅ LLAMADA DIRECTA - el SW la excluye con NO_CACHE_PATTERNS
+      const response = await fetch(
+        "https://ve.dolarapi.com/v1/dolares/oficial",
+        {
+          cache: "no-store",
+          headers: { Accept: "application/json" },
+        },
+      );
 
-      if (!response.ok) {
-        throw new Error(`Error HTTP: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
 
       const data = await response.json();
 
@@ -56,13 +64,9 @@ export class BCVService {
           value: data.promedio,
           fecha: new Date(),
           origen: "api" as const,
-          timestamp: data.fechaActualizacion,
         };
-
-        // Guardar en localStorage
-        this.guardarTasaLocal(tasa.value, data.fechaActualizacion);
+        this.guardarTasaLocal(tasa.value);
         this.ultimaActualizacionExitosa = new Date();
-
         console.log(`✅ Tasa BCV: Bs ${tasa.value.toFixed(2)}`);
         return tasa;
       }
@@ -73,7 +77,6 @@ export class BCVService {
       return this.obtenerTasaRespaldo();
     }
   }
-
   private guardarTasaLocal(tasa: number, timestamp?: string): void {
     if (typeof window !== "undefined") {
       try {
@@ -82,7 +85,7 @@ export class BCVService {
           JSON.stringify({
             value: tasa,
             timestamp: timestamp || new Date().toISOString(),
-          })
+          }),
         );
       } catch (error) {
         console.error("Error guardando tasa:", error);
@@ -96,9 +99,15 @@ export class BCVService {
         const tasaGuardada = localStorage.getItem(this.STORAGE_KEY);
         if (tasaGuardada) {
           const parsed = JSON.parse(tasaGuardada);
+          const fecha = new Date(parsed.timestamp);
+          const horasDesde = (Date.now() - fecha.getTime()) / (1000 * 60 * 60);
+
+          console.log(
+            `📦 Usando tasa guardada (hace ${horasDesde.toFixed(1)} horas)`,
+          );
           return {
             value: parsed.value,
-            fecha: new Date(parsed.timestamp),
+            fecha,
             origen: "local" as const,
           };
         }
@@ -107,6 +116,7 @@ export class BCVService {
       }
     }
 
+    console.log(`📊 Usando tasa por defecto: Bs ${this.TASA_DEFAULT}`);
     return {
       value: this.TASA_DEFAULT,
       fecha: new Date(),

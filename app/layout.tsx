@@ -4,6 +4,7 @@ import { ThemeProvider } from "../src/context/ThemeContext";
 import "./globals.css";
 // ✅ Ruta corregida: se agrega /presentation/
 import SWRegistration from "../src/presentation/components/SWRegistration";
+import Script from "next/script";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,9 +34,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es" suppressHydrationWarning>
+    <html lang="es">
       <head>
-        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+        <Script
+          src="//pl29279691.profitablecpmratenework.com/c6/d0/5c/c6d05c2958c1b6eaafeb46c25ff8ee25.js"
+          strategy="afterInteractive"
+        />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
